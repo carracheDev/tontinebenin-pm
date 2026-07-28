@@ -140,6 +140,7 @@ export class AnalyticsService {
     const mois: Record<string, { creees: number; terminees: number }> = {};
     for (let i = nbMois - 1; i >= 0; i--) {
       const d = new Date();
+      d.setDate(1); // éviter le débordement de mois (ex: 31 → mois suivant)
       d.setMonth(d.getMonth() - i);
       mois[cle(d)] = { creees: 0, terminees: 0 };
     }
