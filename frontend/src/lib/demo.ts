@@ -196,6 +196,24 @@ function resoudre(method: string, url: string): unknown {
   if (u === '/ia/synthese') return ok(rapportContenu.r2);
   if (/^\/ia\/projets\/.+\/rapport$/.test(u)) return ok(rapportContenu.r1);
 
+  if (u === '/messagerie/conversations') {
+    return ok([
+      {
+        id: 'cv1', type: 'CANAL', nom: 'Équipe TontineBénin', interlocuteur: null,
+        membres: membres.slice(0, 4),
+        dernierMessage: { id: 'm3', type: 'TEXTE', contenu: 'Parfait, on avance 💪', creeLe: jour(0), auteur: { id: 'b', nomComplet: 'ADJOVI Marc' } },
+        nonLus: 0,
+      },
+    ]);
+  }
+  if (/^\/messagerie\/conversations\/.+\/messages$/.test(u)) {
+    return ok([
+      { id: 'm1', type: 'TEXTE', contenu: 'Salut l’équipe ! On démarre les cotisations aujourd’hui 🚀', creeLe: jour(0), auteur: { id: 'a', nomComplet: 'GOUTIN Alphonsine', photoUrl: null } },
+      { id: 'm2', type: 'TEXTE', contenu: 'Super, je m’occupe de l’intégration KKiaPay', creeLe: jour(0), auteur: { id: 'b', nomComplet: 'ADJOVI Marc', photoUrl: null } },
+      { id: 'm3', type: 'TEXTE', contenu: 'Parfait, on avance 💪', creeLe: jour(0), auteur: { id: 'b', nomComplet: 'ADJOVI Marc', photoUrl: null } },
+    ]);
+  }
+
   // Mutations et routes non couvertes : succès générique (démo lecture seule)
   return ok({ id: 'demo', ...{} });
 }

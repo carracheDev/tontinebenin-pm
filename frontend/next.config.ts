@@ -8,7 +8,11 @@ const backend = process.env.BACKEND_INTERNAL_URL || "http://127.0.0.1:3100";
 const nextConfig: NextConfig = {
   basePath,
   async rewrites() {
-    return [{ source: "/api/:path*", destination: `${backend}/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${backend}/:path*` },
+      // Temps réel (socket.io) proxifié vers le backend
+      { source: "/socket.io/:path*", destination: `${backend}/socket.io/:path*` },
+    ];
   },
 };
 
