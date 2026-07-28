@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { api, jetons } from './api';
+import { DEMO, membreDemo } from './demo';
 
 export interface Membre {
   id: string;
@@ -29,6 +30,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Au montage : si un token existe, récupère le profil
   useEffect(() => {
+    if (DEMO) {
+      setMembre(membreDemo as Membre);
+      setChargement(false);
+      return;
+    }
     (async () => {
       if (!jetons.access) {
         setChargement(false);

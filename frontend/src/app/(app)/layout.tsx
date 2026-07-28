@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Sidebar } from '@/components/sidebar';
+import { DEMO } from '@/lib/demo';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { membre, chargement } = useAuth();
@@ -24,7 +25,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-fond">
       <Sidebar />
-      <div className="lg:pl-64">{children}</div>
+      <div className="lg:pl-64">
+        {DEMO && (
+          <div className="bg-brand px-4 py-1.5 text-center text-xs font-medium text-white">
+            Mode démonstration — données fictives à des fins d’aperçu du design
+          </div>
+        )}
+        {children}
+      </div>
     </div>
   );
 }

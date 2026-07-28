@@ -1,8 +1,14 @@
 import axios from 'axios';
+import { DEMO, demoAdapter } from './demo';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3100';
 
 export const api = axios.create({ baseURL: API_URL });
+
+// Mode démo : toutes les requêtes sont servies par des données fictives (aucun backend).
+if (DEMO) {
+  api.defaults.adapter = demoAdapter;
+}
 
 const ACCESS = 'tb_pm_access';
 const REFRESH = 'tb_pm_refresh';

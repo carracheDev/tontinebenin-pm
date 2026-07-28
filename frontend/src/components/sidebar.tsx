@@ -14,6 +14,7 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { DEMO } from '@/lib/demo';
 
 const NAV = [
   { href: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -60,13 +61,15 @@ export function Sidebar() {
         })}
       </nav>
 
-      <button
-        onClick={deconnexion}
-        className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-texte transition hover:bg-sidebar-2 hover:text-annuler"
-      >
-        <LogOut size={19} />
-        Déconnexion
-      </button>
+      {!DEMO && (
+        <button
+          onClick={deconnexion}
+          className="mt-4 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-texte transition hover:bg-sidebar-2 hover:text-annuler"
+        >
+          <LogOut size={19} />
+          Déconnexion
+        </button>
+      )}
     </aside>
   );
 }
