@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "TontineBénin Project Manager — application de bureau (Windows / Linux)",
   "author": "TontineBénin",
+  "homepage": "https://github.com/carracheDev/tontinebenin-pm",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
