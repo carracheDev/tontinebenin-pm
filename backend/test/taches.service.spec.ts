@@ -18,13 +18,20 @@ function prismaMock() {
   } as any;
 }
 
+function notifsMock() { return { notifier: jest.fn().mockResolvedValue({}) } as any; }
+function realtimeMock() { return { emitBroadcast: jest.fn(), emitToMembre: jest.fn() } as any; }
+
 describe('TachesService', () => {
   let prisma: any;
+  let notifs: any;
+  let realtime: any;
   let service: TachesService;
 
   beforeEach(() => {
     prisma = prismaMock();
-    service = new TachesService(prisma);
+    notifs = notifsMock();
+    realtime = realtimeMock();
+    service = new TachesService(prisma, notifs, realtime);
   });
 
   it('kanban renvoie les 5 colonnes', async () => {
@@ -48,7 +55,7 @@ describe('TachesService', () => {
   it('créer notifie l’assigné si différent du créateur', async () => {
     prisma.tache.create.mockResolvedValue({ id: 't9', titre: 'X' });
     await service.creer({ projetId: 'p1', titre: 'X', assigneId: 'u2' } as any, 'u1');
-    expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+    expect(notifs.notifier).toHaveBeenCalledTimes(1);
   });
 
   it('déplacer enregistre un historique quand le statut change', async () => {

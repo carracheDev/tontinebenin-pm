@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { StatutTache, TypeNotification } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeGateway } from '../../realtime/realtime.gateway';
 import { CreerTacheDto } from './dto/creer-tache.dto';
 import { MajTacheDto } from './dto/maj-tache.dto';
 import { DeplacerTacheDto } from './dto/deplacer-tache.dto';
@@ -24,7 +26,11 @@ const ASSIGNE = { select: { id: true, nomComplet: true, photoUrl: true } };
 
 @Injectable()
 export class TachesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+    private realtime: RealtimeGateway,
+  ) {}
 
   /** Vue Kanban : les 5 colonnes, chacune avec ses tâches ordonnées. */
   async kanban(projetId: string) {
@@ -81,7 +87,7 @@ export class TachesService {
       include: { assigne: ASSIGNE },
     });
     if (dto.assigneId && dto.assigneId !== createurId) {
-      await this.notifier(dto.assigneId, TypeNotification.TACHE_ASSIGNEE,
+      await this.notifications.notifier(dto.assigneId, TypeNotification.TACHE_ASSIGNEE,
         'Nouvelle tâche assignée', `« ${tache.titre} » vous a été assignée.`, `/taches/${tache.id}`);
     }
     return { succes: true, message: 'Tâche créée.', donnees: tache };
@@ -115,7 +121,7 @@ export class TachesService {
     });
 
     if (dto.assigneId && dto.assigneId !== avant.assigneId && dto.assigneId !== parId) {
-      await this.notifier(dto.assigneId, TypeNotification.TACHE_ASSIGNEE,
+      await this.notifications.notifier(dto.assigneId, TypeNotification.TACHE_ASSIGNEE,
         'Tâche assignée', `« ${tache.titre} » vous a été assignée.`, `/taches/${id}`);
     }
     return { succes: true, message: 'Tâche mise à jour.', donnees: tache };
@@ -132,6 +138,13 @@ export class TachesService {
         ordre: dto.ordre,
         termineLe: dto.statut === 'TERMINE' ? new Date() : null,
       },
+    });
+    // push temps réel : le tableau Kanban se met à jour chez tout le monde
+    this.realtime.emitBroadcast('tache:deplacee', {
+      tacheId: id,
+      projetId: tache.projetId,
+      statut: tache.statut,
+      ordre: tache.ordre,
     });
     return { succes: true, message: 'Tâche déplacée.', donnees: tache };
   }
@@ -163,12 +176,12 @@ export class TachesService {
     // notifier les membres mentionnés
     for (const mid of dto.mentions ?? []) {
       if (mid !== auteurId)
-        await this.notifier(mid, TypeNotification.MENTION,
+        await this.notifications.notifier(mid, TypeNotification.MENTION,
           'Vous avez été mentionné', `sur la tâche « ${tache.titre} ».`, `/taches/${id}`);
     }
     // notifier l'assigné (s'il n'est pas l'auteur)
     if (tache.assigneId && tache.assigneId !== auteurId)
-      await this.notifier(tache.assigneId, TypeNotification.COMMENTAIRE,
+      await this.notifications.notifier(tache.assigneId, TypeNotification.COMMENTAIRE,
         'Nouveau commentaire', `sur « ${tache.titre} ».`, `/taches/${id}`);
     return { succes: true, message: 'Commentaire ajouté.', donnees: commentaire };
   }
@@ -238,18 +251,6 @@ export class TachesService {
     if (a === n) return;
     await this.prisma.historiqueTache.create({
       data: { tacheId, champ, ancienne: a, nouvelle: n, parId },
-    });
-  }
-
-  private async notifier(
-    membreId: string,
-    type: TypeNotification,
-    titre: string,
-    message: string,
-    lien: string,
-  ) {
-    await this.prisma.notification.create({
-      data: { membreId, type, titre, message, lien },
     });
   }
 }
