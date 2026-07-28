@@ -415,6 +415,7 @@ model Evenement {
   debut       DateTime
   fin         DateTime?
   rappelAvantMin Int?       // rappel X minutes avant
+  rappelEnvoye Boolean      @default(false)
   participants ParticipationEvenement[]
   creeLe      DateTime      @default(now())
 

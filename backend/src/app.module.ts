@@ -12,6 +12,8 @@ import { ValidationsModule } from './modules/validations/validations.module';
 import { PilotageModule } from './modules/pilotage/pilotage.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CapitalModule } from './modules/capital/capital.module';
+import { DocumentsModule } from './modules/documents/documents.module';
+import { CalendrierModule } from './modules/calendrier/calendrier.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { CapitalModule } from './modules/capital/capital.module';
     PilotageModule,
     AnalyticsModule,
     CapitalModule,
+    DocumentsModule,
+    CalendrierModule,
   ],
 })
 export class AppModule {}
