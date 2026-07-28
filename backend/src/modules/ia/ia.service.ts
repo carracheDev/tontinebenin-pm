@@ -119,9 +119,30 @@ export class IaService {
 
   /** Reformule le brouillon via l'IA. Retourne null si désactivé/indisponible → socle conservé. */
   private async enrichir(type: TypeRapportIA, brouillon: string): Promise<string | null> {
-    if (this.provider === 'gemini') return this.appelerGemini(type, brouillon);
-    // 'none' (défaut) ou provider non implémenté → pas d'enrichissement
-    return null;
+    switch (this.provider) {
+      case 'gemini':
+        return this.appelerGemini(type, brouillon);
+      case 'groq':
+        return this.appelerGroq(type, brouillon);
+      default:
+        // 'none' (défaut) ou provider non implémenté → pas d'enrichissement
+        return null;
+    }
+  }
+
+  /** Consigne commune à tous les providers : reformuler sans jamais inventer de chiffre. */
+  private construirePrompt(type: TypeRapportIA, brouillon: string): string {
+    return [
+      'Tu es analyste en gestion de projet pour une startup fintech béninoise (TontineBénin).',
+      `Reformule le rapport factuel ci-dessous (type: ${type}) en une synthèse professionnelle en français,`,
+      'claire et orientée décision, à destination des cofondateurs.',
+      "RÈGLE ABSOLUE : n'invente, ne modifie et ne supprime AUCUN chiffre ni fait — appuie-toi STRICTEMENT",
+      'sur les données fournies. Tu peux ajouter des recommandations, mais seulement si elles découlent des données.',
+      'Réponds en Markdown.',
+      '',
+      '--- RAPPORT FACTUEL ---',
+      brouillon,
+    ].join('\n');
   }
 
   private async appelerGemini(type: TypeRapportIA, brouillon: string): Promise<string | null> {
@@ -132,18 +153,7 @@ export class IaService {
     }
     const modele = process.env.IA_MODELE || 'gemini-2.0-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent?key=${cle}`;
-
-    const consigne = [
-      "Tu es analyste en gestion de projet pour une startup fintech béninoise (TontineBénin).",
-      `Reformule le rapport factuel ci-dessous (type: ${type}) en une synthèse professionnelle en français,`,
-      "claire et orientée décision, à destination des cofondateurs.",
-      "RÈGLE ABSOLUE : n'invente, ne modifie et ne supprime AUCUN chiffre ni fait — appuie-toi STRICTEMENT",
-      "sur les données fournies. Tu peux ajouter des recommandations, mais seulement si elles découlent des données.",
-      "Réponds en Markdown.",
-      '',
-      '--- RAPPORT FACTUEL ---',
-      brouillon,
-    ].join('\n');
+    const consigne = this.construirePrompt(type, brouillon);
 
     const ctrl = new AbortController();
     const minuteur = setTimeout(() => ctrl.abort(), 20_000);
@@ -171,6 +181,51 @@ export class IaService {
       return texte.trim();
     } catch (e) {
       this.logger.warn(`[IA] Gemini indisponible (${(e as Error).message}) → socle déterministe.`);
+      return null;
+    } finally {
+      clearTimeout(minuteur);
+    }
+  }
+
+  private async appelerGroq(type: TypeRapportIA, brouillon: string): Promise<string | null> {
+    const cle = process.env.GROQ_API_KEY;
+    if (!cle) {
+      this.logger.warn('[IA] IA_PROVIDER=groq mais GROQ_API_KEY absente → socle déterministe.');
+      return null;
+    }
+    const modele = process.env.GROQ_MODELE || 'llama-3.3-70b-versatile';
+    const consigne = this.construirePrompt(type, brouillon);
+
+    const ctrl = new AbortController();
+    const minuteur = setTimeout(() => ctrl.abort(), 20_000);
+    try {
+      const rep = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${cle}`,
+        },
+        body: JSON.stringify({
+          model: modele,
+          messages: [{ role: 'user', content: consigne }],
+          temperature: 0.3,
+          max_tokens: 2048,
+        }),
+        signal: ctrl.signal,
+      });
+      if (!rep.ok) {
+        this.logger.warn(`[IA] Groq HTTP ${rep.status} → socle déterministe.`);
+        return null;
+      }
+      const json: any = await rep.json();
+      const texte: string | undefined = json?.choices?.[0]?.message?.content || undefined;
+      if (!texte || !texte.trim()) {
+        this.logger.warn('[IA] Groq réponse vide → socle déterministe.');
+        return null;
+      }
+      return texte.trim();
+    } catch (e) {
+      this.logger.warn(`[IA] Groq indisponible (${(e as Error).message}) → socle déterministe.`);
       return null;
     } finally {
       clearTimeout(minuteur);
