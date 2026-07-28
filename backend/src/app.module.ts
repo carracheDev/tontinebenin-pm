@@ -15,6 +15,7 @@ import { ContributionModule } from './modules/contribution/contribution.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { CalendrierModule } from './modules/calendrier/calendrier.module';
 import { IaModule } from './modules/ia/ia.module';
+import { MessagerieModule } from './modules/messagerie/messagerie.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { IaModule } from './modules/ia/ia.module';
     DocumentsModule,
     CalendrierModule,
     IaModule,
+    MessagerieModule,
   ],
 })
 export class AppModule {}

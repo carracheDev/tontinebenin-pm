@@ -68,6 +68,8 @@ model Membre {
   membreProjets    MembreProjet[]
   journalActions   JournalAction[]
   risquesResponsable Risque[]         @relation("RisqueResponsable")
+  conversations    MembreConversation[]
+  messagesEnvoyes  Message[]
 
   creeLe     DateTime @default(now())
   misAJourLe DateTime @updatedAt
@@ -480,4 +482,54 @@ model RapportIA {
   genereeLe DateTime      @default(now())
 
   @@index([type, genereeLe])
+}
+
+// ───────────────────── MESSAGERIE ─────────────────────
+
+enum TypeConversation {
+  CANAL   // canal d'équipe (groupe)
+  DIRECT  // message privé 1-à-1
+}
+
+enum TypeMessage {
+  TEXTE
+  VOCAL
+}
+
+model Conversation {
+  id        String           @id @default(uuid())
+  type      TypeConversation
+  nom       String?          // nom du canal ; null pour un DM
+  creeLe    DateTime         @default(now())
+  membres   MembreConversation[]
+  messages  Message[]
+
+  @@index([type])
+}
+
+model MembreConversation {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  membreId       String
+  membre         Membre       @relation(fields: [membreId], references: [id])
+  luJusquauLe    DateTime?    // dernière lecture (pour les non-lus)
+
+  @@unique([conversationId, membreId])
+  @@index([membreId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  auteurId       String
+  auteur         Membre       @relation(fields: [auteurId], references: [id])
+  type           TypeMessage  @default(TEXTE)
+  contenu        String?      // texte du message
+  audioFichier   String?      // nom du fichier vocal (uploads/audio)
+  dureeSec       Int?         // durée du vocal en secondes
+  creeLe         DateTime     @default(now())
+
+  @@index([conversationId, creeLe])
 }
