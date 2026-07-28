@@ -113,11 +113,11 @@ export class AuthService {
     };
     const accessToken = this.jwt.sign(payload, {
       secret: process.env.JWT_SECRET || 'change-me-access',
-      expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+      expiresIn: (process.env.JWT_EXPIRES_IN || '24h') as never,
     });
     const refreshToken = this.jwt.sign(payload, {
       secret: process.env.JWT_REFRESH_SECRET || 'change-me-refresh',
-      expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+      expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as never,
     });
     return {
       accessToken,
