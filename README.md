@@ -94,11 +94,11 @@ tontinebenin-pm/
 | Phase | Contenu | Livrable |
 |---|---|---|
 | **0. Fondations** ✅ | Analyse, architecture, **schéma BD**, plan | ce dépôt |
-| **1. Socle** | Auth + RBAC, module Membres, module Projets, migration Prisma | API + login fonctionnels |
-| **2. Tâches** | CRUD tâches, Kanban, commentaires, mentions, pièces jointes, historique | tableau Jira-like |
-| **3. Collaboration** | Validations (workflow), blocages, notifications in-app + WebSocket | temps réel |
-| **4. Pilotage** | Phases, objectifs, jalons/roadmap, calcul d'avancement, risques | vision globale |
-| **5. Dashboard** | Analytics + graphiques (avancement, charge, perf/membre, timeline) | tableau de bord |
+| **1. Socle** ✅ | Auth + RBAC, module Membres, module Projets, migration Prisma | API + login fonctionnels |
+| **2. Tâches** ✅ | CRUD tâches, Kanban, commentaires, mentions, pièces jointes, historique | tableau Jira-like |
+| **3. Collaboration** ✅ | Validations (workflow), blocages, notifications in-app + WebSocket | temps réel |
+| **4. Pilotage** ✅ | Phases, objectifs, jalons/roadmap, calcul d'avancement, risques | vision globale |
+| **5. Dashboard** ✅ | Analytics + graphiques (avancement, charge, perf/membre, timeline) | tableau de bord |
 | **6. Capital** | Parts + vesting (cliff, acquisition mensuelle, cron nocturne), historique | suivi des parts |
 | **7. Documents & Calendrier** | Espace documentaire versionné + calendrier + rappels | GED + agenda |
 | **8. Assistant IA** | Rapports auto (état, retards, risques, perf) via LLM | reporting IA |

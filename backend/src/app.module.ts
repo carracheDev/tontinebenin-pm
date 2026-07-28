@@ -9,6 +9,7 @@ import { TachesModule } from './modules/taches/taches.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ValidationsModule } from './modules/validations/validations.module';
 import { PilotageModule } from './modules/pilotage/pilotage.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PilotageModule } from './modules/pilotage/pilotage.module';
     NotificationsModule,
     ValidationsModule,
     PilotageModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}
