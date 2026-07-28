@@ -1,5 +1,273 @@
-import { EnConstruction } from '@/components/en-construction';
+'use client';
 
-export default function Page() {
-  return <EnConstruction titre="Tâches" />;
+import { useCallback, useEffect, useState } from 'react';
+import { Plus, MessageSquare, Paperclip, X, CalendarClock } from 'lucide-react';
+import { AxiosError } from 'axios';
+import { Header } from '@/components/header';
+import { Card } from '@/components/ui';
+import { api } from '@/lib/api';
+
+interface Assigne { id: string; nomComplet: string; photoUrl?: string | null }
+interface Tache {
+  id: string;
+  titre: string;
+  description?: string | null;
+  statut: string;
+  priorite: string;
+  echeance?: string | null;
+  assigne?: Assigne | null;
+  _count?: { commentaires: number; piecesJointes: number };
+}
+interface Colonne { statut: string; taches: Tache[] }
+interface Projet { id: string; nom: string }
+
+const COLS: { statut: string; label: string; accent: string }[] = [
+  { statut: 'A_FAIRE', label: 'À faire', accent: 'var(--texte-sec)' },
+  { statut: 'EN_COURS', label: 'En cours', accent: 'var(--brand)' },
+  { statut: 'EN_VALIDATION', label: 'En validation', accent: 'var(--attention)' },
+  { statut: 'TERMINE', label: 'Terminé', accent: 'var(--succes)' },
+  { statut: 'BLOQUE', label: 'Bloqué', accent: 'var(--annuler)' },
+];
+const PRIORITES = ['BASSE', 'MOYENNE', 'HAUTE', 'CRITIQUE'];
+const COULEUR_PRIO: Record<string, string> = {
+  BASSE: 'bg-texte-sec/15 text-texte-sec',
+  MOYENNE: 'bg-brand/15 text-brand',
+  HAUTE: 'bg-attention/15 text-attention',
+  CRITIQUE: 'bg-annuler/15 text-annuler',
+};
+
+export default function TachesPage() {
+  const [projets, setProjets] = useState<Projet[]>([]);
+  const [projetId, setProjetId] = useState('');
+  const [colonnes, setColonnes] = useState<Colonne[]>([]);
+  const [membres, setMembres] = useState<Assigne[]>([]);
+  const [charge, setCharge] = useState(true);
+  const [modal, setModal] = useState(false);
+  const [drag, setDrag] = useState<{ id: string; from: string } | null>(null);
+
+  const chargerKanban = useCallback(async (pid: string) => {
+    if (!pid) return;
+    const { data } = await api.get(`/projets/${pid}/taches`);
+    setColonnes(data.donnees.colonnes);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const [p, m] = await Promise.all([api.get('/projets'), api.get('/membres')]);
+      setProjets(p.data.donnees);
+      setMembres(m.data.donnees ?? m.data);
+      const premier = p.data.donnees[0]?.id ?? '';
+      setProjetId(premier);
+      if (premier) await chargerKanban(premier);
+      setCharge(false);
+    })();
+  }, [chargerKanban]);
+
+  async function deposer(statut: string) {
+    if (!drag || drag.from === statut) {
+      setDrag(null);
+      return;
+    }
+    const idTache = drag.id;
+    // Optimiste : déplace la carte tout de suite
+    setColonnes((cols) => {
+      const copie = cols.map((c) => ({ ...c, taches: [...c.taches] }));
+      let carte: Tache | undefined;
+      for (const c of copie) {
+        const i = c.taches.findIndex((t) => t.id === idTache);
+        if (i >= 0) { carte = c.taches.splice(i, 1)[0]; break; }
+      }
+      if (carte) {
+        carte.statut = statut;
+        copie.find((c) => c.statut === statut)?.taches.push(carte);
+      }
+      return copie;
+    });
+    const ordre = colonnes.find((c) => c.statut === statut)?.taches.length ?? 0;
+    setDrag(null);
+    try {
+      await api.patch(`/taches/${idTache}/deplacer`, { statut, ordre });
+    } catch {
+      chargerKanban(projetId); // rollback via refetch
+    }
+  }
+
+  return (
+    <>
+      <Header titre="Tâches" />
+      <main className="space-y-5 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <select
+            value={projetId}
+            onChange={(e) => { setProjetId(e.target.value); chargerKanban(e.target.value); }}
+            className="rounded-lg border border-bordure bg-surface px-3 py-2 text-sm text-texte outline-none focus:border-brand"
+          >
+            {projets.length === 0 && <option>Aucun projet</option>}
+            {projets.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
+          </select>
+          <button
+            onClick={() => setModal(true)}
+            disabled={!projetId}
+            className="flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-fonce disabled:opacity-50"
+          >
+            <Plus size={17} /> Nouvelle tâche
+          </button>
+        </div>
+
+        {charge ? (
+          <p className="text-sm text-texte-sec">Chargement…</p>
+        ) : !projetId ? (
+          <Card className="grid min-h-[40vh] place-items-center text-center">
+            <p className="text-sm text-texte-sec">Crée d’abord un projet dans la section « Projets ».</p>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            {COLS.map((col) => {
+              const c = colonnes.find((x) => x.statut === col.statut);
+              const taches = c?.taches ?? [];
+              return (
+                <div
+                  key={col.statut}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => deposer(col.statut)}
+                  className="flex flex-col rounded-2xl border border-bordure bg-surface-2/50 p-3"
+                >
+                  <div className="mb-3 flex items-center gap-2 px-1">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: col.accent }} />
+                    <span className="text-sm font-semibold text-texte">{col.label}</span>
+                    <span className="ml-auto rounded-full bg-surface px-2 py-0.5 text-xs text-texte-sec">{taches.length}</span>
+                  </div>
+                  <div className="flex flex-1 flex-col gap-2">
+                    {taches.map((t) => (
+                      <div
+                        key={t.id}
+                        draggable
+                        onDragStart={() => setDrag({ id: t.id, from: t.statut })}
+                        className="cursor-grab rounded-xl border border-bordure bg-surface p-3 shadow-sm transition hover:border-brand active:cursor-grabbing"
+                      >
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium text-texte">{t.titre}</p>
+                          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${COULEUR_PRIO[t.priorite] ?? ''}`}>
+                            {t.priorite}
+                          </span>
+                        </div>
+                        {t.description && <p className="mb-2 line-clamp-2 text-xs text-texte-sec">{t.description}</p>}
+                        <div className="flex items-center gap-3 text-xs text-texte-sec">
+                          {t.echeance && (
+                            <span className="flex items-center gap-1">
+                              <CalendarClock size={13} />
+                              {new Date(t.echeance).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                            </span>
+                          )}
+                          {!!t._count?.commentaires && <span className="flex items-center gap-1"><MessageSquare size={13} />{t._count.commentaires}</span>}
+                          {!!t._count?.piecesJointes && <span className="flex items-center gap-1"><Paperclip size={13} />{t._count.piecesJointes}</span>}
+                          {t.assigne && (
+                            <span className="ml-auto grid h-6 w-6 place-items-center rounded-full bg-brand text-[10px] font-semibold text-white" title={t.assigne.nomComplet}>
+                              {t.assigne.nomComplet.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {taches.length === 0 && <p className="px-1 py-4 text-center text-xs text-texte-sec">—</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+
+      {modal && (
+        <ModalTache
+          projetId={projetId}
+          membres={membres}
+          onFerme={() => setModal(false)}
+          onCree={() => chargerKanban(projetId)}
+        />
+      )}
+    </>
+  );
+}
+
+function ModalTache({
+  projetId, membres, onFerme, onCree,
+}: { projetId: string; membres: Assigne[]; onFerme: () => void; onCree: () => void }) {
+  const [titre, setTitre] = useState('');
+  const [description, setDescription] = useState('');
+  const [priorite, setPriorite] = useState('MOYENNE');
+  const [assigneId, setAssigneId] = useState('');
+  const [echeance, setEcheance] = useState('');
+  const [erreur, setErreur] = useState('');
+  const [charge, setCharge] = useState(false);
+
+  async function soumettre(e: React.FormEvent) {
+    e.preventDefault();
+    setErreur(''); setCharge(true);
+    try {
+      await api.post('/taches', {
+        projetId, titre, priorite,
+        description: description || undefined,
+        assigneId: assigneId || undefined,
+        echeance: echeance ? new Date(echeance).toISOString() : undefined,
+      });
+      onCree(); onFerme();
+    } catch (err) {
+      const ax = err as AxiosError<{ message?: string }>;
+      setErreur(ax.response?.data?.message ?? 'Création impossible.');
+    } finally {
+      setCharge(false);
+    }
+  }
+
+  const champ = 'w-full rounded-lg border border-bordure bg-surface-2 px-3 py-2.5 text-sm text-texte outline-none transition focus:border-brand';
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
+      <div className="w-full max-w-md rounded-2xl border border-bordure bg-surface p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-texte">Nouvelle tâche</h2>
+          <button onClick={onFerme} className="text-texte-sec hover:text-texte"><X size={20} /></button>
+        </div>
+        <form onSubmit={soumettre} className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-texte">Titre *</label>
+            <input required minLength={2} value={titre} onChange={(e) => setTitre(e.target.value)} className={champ} placeholder="Intégrer l’API paiement" />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-texte">Description</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={champ} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-texte">Priorité</label>
+              <select value={priorite} onChange={(e) => setPriorite(e.target.value)} className={champ}>
+                {PRIORITES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-texte">Échéance</label>
+              <input type="date" value={echeance} onChange={(e) => setEcheance(e.target.value)} className={champ} />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-texte">Assigné à</label>
+            <select value={assigneId} onChange={(e) => setAssigneId(e.target.value)} className={champ}>
+              <option value="">— personne —</option>
+              {membres.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}
+            </select>
+          </div>
+
+          {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onFerme} className="rounded-lg border border-bordure px-4 py-2 text-sm font-medium text-texte-sec transition hover:text-texte">Annuler</button>
+            <button type="submit" disabled={charge} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-fonce disabled:opacity-60">
+              {charge ? 'Création…' : 'Créer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
