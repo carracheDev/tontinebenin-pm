@@ -8,6 +8,7 @@ import { ProjetsModule } from './modules/projets/projets.module';
 import { TachesModule } from './modules/taches/taches.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ValidationsModule } from './modules/validations/validations.module';
+import { PilotageModule } from './modules/pilotage/pilotage.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ValidationsModule } from './modules/validations/validations.module';
     TachesModule,
     NotificationsModule,
     ValidationsModule,
+    PilotageModule,
   ],
 })
 export class AppModule {}
