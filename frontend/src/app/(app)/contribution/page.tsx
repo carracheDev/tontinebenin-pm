@@ -6,6 +6,7 @@ import { Info } from 'lucide-react';
 import { Header } from '@/components/header';
 import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 interface Ligne {
   membre: { id: string; nomComplet: string; typeMembre: string };
@@ -21,6 +22,8 @@ interface Projete { membre: string; typeMembre: string; pourcentageProjete: numb
 const PALETTE = ['#2563EB', '#3B82F6', '#8B5CF6', '#F59E0B', '#10B981', '#EC4899', '#06B6D4'];
 
 export default function ContributionPage() {
+  const { membre } = useAuth();
+  const estAdmin = membre?.role === 'ADMIN';
   const [lignes, setLignes] = useState<Ligne[]>([]);
   const [projection, setProjection] = useState<Projete[]>([]);
   const [plancher, setPlancher] = useState(60);
@@ -28,6 +31,10 @@ export default function ContributionPage() {
   const [charge, setCharge] = useState(true);
 
   useEffect(() => {
+    if (!estAdmin) {
+      setCharge(false);
+      return;
+    }
     (async () => {
       try {
         const [t, p] = await Promise.all([api.get('/contribution'), api.get('/contribution/projection')]);
@@ -39,7 +46,24 @@ export default function ContributionPage() {
         setCharge(false);
       }
     })();
-  }, []);
+  }, [estAdmin]);
+
+  // Accès réservé au fondateur (les membres ne voient pas la contribution)
+  if (membre && !estAdmin) {
+    return (
+      <>
+        <Header titre="Contribution" />
+        <main className="p-6">
+          <Card className="grid min-h-[50vh] place-items-center text-center">
+            <div className="flex flex-col items-center gap-2 text-texte-sec">
+              <Info size={26} className="text-texte-sec/50" />
+              <p className="text-sm">Cette section est réservée au fondateur.</p>
+            </div>
+          </Card>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

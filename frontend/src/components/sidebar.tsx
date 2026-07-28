@@ -24,12 +24,13 @@ const NAV = [
   { href: '/ia', label: 'Assistant IA', icon: Sparkles },
   { href: '/analytics', label: 'Analytics', icon: PieChart },
   { href: '/equipe', label: 'Équipe', icon: Users },
-  { href: '/contribution', label: 'Contribution', icon: Award },
+  { href: '/contribution', label: 'Contribution', icon: Award, adminSeulement: true },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { deconnexion } = useAuth();
+  const { membre, deconnexion } = useAuth();
+  const estAdmin = membre?.role === 'ADMIN';
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-sidebar px-4 py-6 lg:flex">
@@ -42,7 +43,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.filter((i) => !('adminSeulement' in i) || estAdmin).map(({ href, label, icon: Icon }) => {
           const actif = pathname === href || pathname.startsWith(href + '/');
           return (
             <Link
