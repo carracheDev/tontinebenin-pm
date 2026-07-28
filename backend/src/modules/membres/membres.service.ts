@@ -42,7 +42,7 @@ export class MembresService {
   async detail(id: string) {
     const membre = await this.prisma.membre.findUnique({
       where: { id },
-      select: { ...SANS_SECRET, capital: true },
+      select: SANS_SECRET,
     });
     if (!membre) throw new NotFoundException({ message: 'Membre introuvable.' });
     return { succes: true, message: 'Détail du membre.', donnees: membre };
