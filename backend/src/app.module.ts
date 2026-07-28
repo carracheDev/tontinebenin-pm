@@ -11,7 +11,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { ValidationsModule } from './modules/validations/validations.module';
 import { PilotageModule } from './modules/pilotage/pilotage.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
-import { CapitalModule } from './modules/capital/capital.module';
+import { ContributionModule } from './modules/contribution/contribution.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { CalendrierModule } from './modules/calendrier/calendrier.module';
 import { IaModule } from './modules/ia/ia.module';
@@ -30,7 +30,7 @@ import { IaModule } from './modules/ia/ia.module';
     ValidationsModule,
     PilotageModule,
     AnalyticsModule,
-    CapitalModule,
+    ContributionModule,
     DocumentsModule,
     CalendrierModule,
     IaModule,

@@ -57,7 +57,6 @@ model Membre {
   responsabilites String?
 
   // Relations
-  capital          Capital?
   tachesAssignees  Tache[]            @relation("TacheAssignee")
   tachesCreees     Tache[]            @relation("TacheCreateur")
   commentaires     Commentaire[]
@@ -77,36 +76,11 @@ model Membre {
   @@index([statut])
 }
 
-// ───────────────────── CAPITAL & VESTING ─────────────────────
-
-model Capital {
-  id            String   @id @default(uuid())
-  membreId      String   @unique
-  membre        Membre   @relation(fields: [membreId], references: [id])
-
-  pourcentageAlloue  Float  // parts prévues au pacte (ex: 20.0)
-  pourcentageAcquis  Float  @default(0) // vesting acquis à ce jour
-
-  // Vesting
-  vestingActif   Boolean  @default(true)
-  dureeVestingMois Int    @default(48)     // 4 ans
-  cliffMois        Int    @default(12)     // 1 an
-  dateDebutVesting DateTime @default(now())
-
-  historique  HistoriqueCapital[]
-  misAJourLe  DateTime @updatedAt
-}
-
-model HistoriqueCapital {
-  id         String   @id @default(uuid())
-  capitalId  String
-  capital    Capital  @relation(fields: [capitalId], references: [id])
-  pourcentageAcquis Float
-  motif      String?  // "acquisition mensuelle", "cliff atteint", "révision"
-  calculeLe  DateTime @default(now())
-
-  @@index([capitalId, calculeLe])
-}
+// Note : l'entreprise est juridiquement une entreprise individuelle — le
+// fondateur détient 100 %. Aucune part n'est attribuée et aucun capital n'est
+// divisible en l'état. La contribution de chaque membre est documentée via le
+// modèle `Contribution` (registre) ; une éventuelle répartition ne pourrait
+// exister qu'après passage en société (SARL). Voir module `contribution`.
 
 // ───────────────────── PROJETS & STRUCTURE ─────────────────────
 

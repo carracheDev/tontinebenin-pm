@@ -10,7 +10,7 @@ import {
   Sparkles,
   PieChart,
   Users,
-  Coins,
+  Award,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -23,7 +23,7 @@ const NAV = [
   { href: '/ia', label: 'Assistant IA', icon: Sparkles },
   { href: '/analytics', label: 'Analytics', icon: PieChart },
   { href: '/equipe', label: 'Équipe', icon: Users },
-  { href: '/capital', label: 'Capital', icon: Coins },
+  { href: '/contribution', label: 'Contribution', icon: Award },
 ];
 
 export function Sidebar() {
