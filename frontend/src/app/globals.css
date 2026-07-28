@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+/* Dark mode piloté par la classe .dark (posée par next-themes) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── Thème CLAIR (défaut) ── */
+:root {
+  --fond: #eef2fb;
+  --surface: #ffffff;
+  --surface-2: #f7f9fd;
+  --texte: #1f2937;
+  --texte-sec: #6b7280;
+  --bordure: #e9edf6;
+
+  --brand: #2563eb;
+  --brand-clair: #3b82f6;
+  --brand-fonce: #1e3a8a;
+  --brand-tuile: #e8eefd;
+
+  --succes: #16a34a;
+  --annuler: #dc2626;
+  --attention: #d97706;
+  --or: #fcd34d;
+
+  /* La sidebar reste sombre dans les deux thèmes (style Specter) */
+  --sidebar: #0f172a;
+  --sidebar-2: #1e293b;
+  --sidebar-texte: #94a3b8;
+  --sidebar-actif: #2563eb;
+}
+
+/* ── Thème SOMBRE ── */
+.dark {
+  --fond: #0b1120;
+  --surface: #111827;
+  --surface-2: #1e293b;
+  --texte: #e2e8f0;
+  --texte-sec: #94a3b8;
+  --bordure: #1e293b;
+
+  --brand-tuile: #172554;
+
+  --sidebar: #0b1120;
+  --sidebar-2: #111827;
+  --sidebar-texte: #94a3b8;
+}
+
+/* Expose les tokens comme couleurs Tailwind (bg-surface, text-texte, border-bordure…) */
+@theme inline {
+  --color-fond: var(--fond);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-texte: var(--texte);
+  --color-texte-sec: var(--texte-sec);
+  --color-bordure: var(--bordure);
+
+  --color-brand: var(--brand);
+  --color-brand-clair: var(--brand-clair);
+  --color-brand-fonce: var(--brand-fonce);
+  --color-brand-tuile: var(--brand-tuile);
+
+  --color-succes: var(--succes);
+  --color-annuler: var(--annuler);
+  --color-attention: var(--attention);
+  --color-or: var(--or);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-2: var(--sidebar-2);
+  --color-sidebar-texte: var(--sidebar-texte);
+  --color-sidebar-actif: var(--sidebar-actif);
+}
+
+* {
+  border-color: var(--bordure);
+}
+
+body {
+  background: var(--fond);
+  color: var(--texte);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar discrète */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--texte-sec);
+  opacity: 0.3;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -1,0 +1,30 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
+import { Sidebar } from '@/components/sidebar';
+
+export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { membre, chargement } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!chargement && !membre) router.replace('/connexion');
+  }, [chargement, membre, router]);
+
+  if (chargement || !membre) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-fond">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-bordure border-t-brand" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-fond">
+      <Sidebar />
+      <div className="lg:pl-64">{children}</div>
+    </div>
+  );
+}
