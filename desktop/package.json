@@ -1,0 +1,40 @@
+{
+  "name": "tontinebenin-pm-desktop",
+  "version": "1.0.0",
+  "description": "TontineBénin Project Manager — application de bureau (Windows / Linux)",
+  "author": "TontineBénin",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:linux": "electron-builder --linux AppImage deb",
+    "dist:win": "electron-builder --win nsis",
+    "dist": "electron-builder -lw"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "bj.tontinebenin.pm",
+    "productName": "TontineBenin PM",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "build/**"],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Office",
+      "icon": "build/icon.png",
+      "maintainer": "TontineBénin"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "TontineBenin PM"
+    }
+  }
+}

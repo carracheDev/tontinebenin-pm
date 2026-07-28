@@ -1,0 +1,51 @@
+name: Build application de bureau
+
+# Se lance manuellement (onglet Actions → Run workflow) ou sur un tag vX.Y.Z
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cmd: dist:linux
+          - os: windows-latest
+            cmd: dist:win
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run ${{ matrix.cmd }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installeurs-${{ matrix.os }}
+          if-no-files-found: ignore
+          path: |
+            desktop/dist/*.AppImage
+            desktop/dist/*.deb
+            desktop/dist/*.exe
+
+  # Sur un tag vX.Y.Z : publie une Release GitHub avec les installeurs attachés
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: artefacts }
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artefacts/**/*
