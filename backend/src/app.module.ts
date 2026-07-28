@@ -14,6 +14,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CapitalModule } from './modules/capital/capital.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { CalendrierModule } from './modules/calendrier/calendrier.module';
+import { IaModule } from './modules/ia/ia.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { CalendrierModule } from './modules/calendrier/calendrier.module';
     CapitalModule,
     DocumentsModule,
     CalendrierModule,
+    IaModule,
   ],
 })
 export class AppModule {}
