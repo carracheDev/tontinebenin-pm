@@ -1,0 +1,508 @@
+// ════════════════════════════════════════════════════════════════════
+//  TONTINE BÉNIN PROJECT MANAGER — Modèle de données (source de vérité)
+//  Stack : NestJS · Prisma · PostgreSQL
+//  Couvre : équipe, capital/vesting, projets/phases/objectifs, roadmap,
+//           tâches/commentaires/pièces jointes, validations, risques,
+//           documents, calendrier, notifications, permissions, audit, IA.
+// ════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────── ÉQUIPE ─────────────────────────
+
+enum TypeMembre {
+  FONDATEUR
+  COFONDATEUR
+  COLLABORATEUR
+  PRESTATAIRE
+  STAGIAIRE
+}
+
+enum StatutMembre {
+  ACTIF
+  INACTIF
+  PARTI
+  SUSPENDU
+}
+
+enum Role {
+  ADMIN        // fondateur : accès complet
+  MANAGER      // cofondateur : gère ses modules + validation
+  MEMBRE       // collaborateur : tâches autorisées
+  OBSERVATEUR  // lecture seule (investisseur, mentor)
+}
+
+model Membre {
+  id             String       @id @default(uuid())
+  nomComplet     String
+  email          String       @unique
+  motDePasseHash String
+  telephone      String?
+  photoUrl       String?
+  poste          String?      // ex: "Développeur mobile"
+  typeMembre     TypeMembre   @default(COLLABORATEUR)
+  role           Role         @default(MEMBRE)
+  statut         StatutMembre @default(ACTIF)
+
+  dateIntegration DateTime  @default(now())
+  disponibilite   String?   // ex: "Temps plein", "20 h/semaine"
+  niveauImplication Int     @default(0) // 0..100
+  competences     String[]  // ex: ["Flutter","NestJS"]
+  responsabilites String?
+
+  // Relations
+  capital          Capital?
+  tachesAssignees  Tache[]            @relation("TacheAssignee")
+  tachesCreees     Tache[]            @relation("TacheCreateur")
+  commentaires     Commentaire[]
+  contributions    Contribution[]
+  notifications    Notification[]
+  validationsFaites Validation[]      @relation("Validateur")
+  documentsAjoutes Document[]
+  evenements       ParticipationEvenement[]
+  membreProjets    MembreProjet[]
+  journalActions   JournalAction[]
+  risquesResponsable Risque[]         @relation("RisqueResponsable")
+
+  creeLe     DateTime @default(now())
+  misAJourLe DateTime @updatedAt
+
+  @@index([typeMembre])
+  @@index([statut])
+}
+
+// ───────────────────── CAPITAL & VESTING ─────────────────────
+
+model Capital {
+  id            String   @id @default(uuid())
+  membreId      String   @unique
+  membre        Membre   @relation(fields: [membreId], references: [id])
+
+  pourcentageAlloue  Float  // parts prévues au pacte (ex: 20.0)
+  pourcentageAcquis  Float  @default(0) // vesting acquis à ce jour
+
+  // Vesting
+  vestingActif   Boolean  @default(true)
+  dureeVestingMois Int    @default(48)     // 4 ans
+  cliffMois        Int    @default(12)     // 1 an
+  dateDebutVesting DateTime @default(now())
+
+  historique  HistoriqueCapital[]
+  misAJourLe  DateTime @updatedAt
+}
+
+model HistoriqueCapital {
+  id         String   @id @default(uuid())
+  capitalId  String
+  capital    Capital  @relation(fields: [capitalId], references: [id])
+  pourcentageAcquis Float
+  motif      String?  // "acquisition mensuelle", "cliff atteint", "révision"
+  calculeLe  DateTime @default(now())
+
+  @@index([capitalId, calculeLe])
+}
+
+// ───────────────────── PROJETS & STRUCTURE ─────────────────────
+
+enum StatutProjet {
+  PLANIFIE
+  EN_COURS
+  EN_PAUSE
+  TERMINE
+  ANNULE
+}
+
+enum Priorite {
+  BASSE
+  MOYENNE
+  HAUTE
+  CRITIQUE
+}
+
+model Projet {
+  id            String       @id @default(uuid())
+  nom           String
+  description   String?
+  statut        StatutProjet @default(PLANIFIE)
+  priorite      Priorite     @default(MOYENNE)
+  avancement    Int          @default(0) // 0..100 (calculé)
+  dateDebut     DateTime?
+  dateFinPrevue DateTime?
+  dateFinReelle DateTime?
+  version       String?      // ex: "v1.0"
+
+  parentId String?
+  parent   Projet?  @relation("SousProjets", fields: [parentId], references: [id])
+  enfants  Projet[] @relation("SousProjets")
+
+  phases       Phase[]
+  objectifs    Objectif[]
+  taches       Tache[]
+  jalons       Jalon[]
+  risques      Risque[]
+  documents    Document[]
+  evenements   Evenement[]
+  membres      MembreProjet[]
+  rapportsIA   RapportIA[]
+
+  creeLe     DateTime @default(now())
+  misAJourLe DateTime @updatedAt
+
+  @@index([statut])
+}
+
+model MembreProjet {
+  id        String @id @default(uuid())
+  projetId  String
+  membreId  String
+  roleProjet String? // rôle spécifique dans ce projet
+  projet    Projet @relation(fields: [projetId], references: [id])
+  membre    Membre @relation(fields: [membreId], references: [id])
+
+  @@unique([projetId, membreId])
+}
+
+model Phase {
+  id          String    @id @default(uuid())
+  projetId    String
+  projet      Projet    @relation(fields: [projetId], references: [id])
+  nom         String
+  ordre       Int       @default(0)
+  statut      StatutProjet @default(PLANIFIE)
+  avancement  Int       @default(0)
+  dateDebut   DateTime?
+  dateFin     DateTime?
+  taches      Tache[]
+
+  @@index([projetId, ordre])
+}
+
+model Objectif {
+  id          String   @id @default(uuid())
+  projetId    String
+  projet      Projet   @relation(fields: [projetId], references: [id])
+  libelle     String
+  description String?
+  atteint     Boolean  @default(false)
+  atteintLe   DateTime?
+  echeance    DateTime?
+
+  @@index([projetId])
+}
+
+// ───────────────────── ROADMAP (JALONS) ─────────────────────
+
+model Jalon {
+  id          String    @id @default(uuid())
+  projetId    String
+  projet      Projet    @relation(fields: [projetId], references: [id])
+  titre       String
+  description String?
+  date        DateTime
+  atteint     Boolean   @default(false)
+  version     String?   // release visée
+
+  @@index([projetId, date])
+}
+
+// ───────────────────── TÂCHES (Jira-like) ─────────────────────
+
+enum StatutTache {
+  A_FAIRE
+  EN_COURS
+  EN_VALIDATION
+  TERMINE
+  BLOQUE
+}
+
+model Tache {
+  id          String      @id @default(uuid())
+  projetId    String
+  projet      Projet      @relation(fields: [projetId], references: [id])
+  phaseId     String?
+  phase       Phase?      @relation(fields: [phaseId], references: [id])
+
+  titre       String
+  description String?
+  statut      StatutTache @default(A_FAIRE)
+  priorite    Priorite    @default(MOYENNE)
+  ordre       Int         @default(0) // position dans la colonne (Kanban)
+
+  assigneId   String?
+  assigne     Membre?     @relation("TacheAssignee", fields: [assigneId], references: [id])
+  createurId  String
+  createur    Membre      @relation("TacheCreateur", fields: [createurId], references: [id])
+
+  dateDebut   DateTime?
+  echeance    DateTime?
+  termineLe   DateTime?
+  tempsEstimeH Float?
+  tempsPasseH  Float?
+
+  commentaires Commentaire[]
+  piecesJointes PieceJointe[]
+  validations  Validation[]
+  historique   HistoriqueTache[]
+  blocage      Blocage?
+
+  creeLe     DateTime @default(now())
+  misAJourLe DateTime @updatedAt
+
+  @@index([projetId, statut])
+  @@index([assigneId])
+}
+
+model Commentaire {
+  id        String   @id @default(uuid())
+  tacheId   String
+  tache     Tache    @relation(fields: [tacheId], references: [id])
+  auteurId  String
+  auteur    Membre   @relation(fields: [auteurId], references: [id])
+  contenu   String
+  mentions  String[] // ids des membres mentionnés (@nom)
+  creeLe    DateTime @default(now())
+
+  @@index([tacheId, creeLe])
+}
+
+model PieceJointe {
+  id       String @id @default(uuid())
+  tacheId  String
+  tache    Tache  @relation(fields: [tacheId], references: [id])
+  nom      String
+  url      String
+  type     String? // mime
+  tailleKo Int?
+  creeLe   DateTime @default(now())
+}
+
+model HistoriqueTache {
+  id       String   @id @default(uuid())
+  tacheId  String
+  tache    Tache    @relation(fields: [tacheId], references: [id])
+  champ    String   // "statut", "assigne", ...
+  ancienne String?
+  nouvelle String?
+  parId    String?
+  creeLe   DateTime @default(now())
+
+  @@index([tacheId, creeLe])
+}
+
+model Blocage {
+  id         String    @id @default(uuid())
+  tacheId    String    @unique
+  tache      Tache     @relation(fields: [tacheId], references: [id])
+  motif      String
+  solution   String?
+  resolu     Boolean   @default(false)
+  resoluLe   DateTime?
+  creeLe     DateTime  @default(now())
+}
+
+// ───────────────────── VALIDATIONS (workflow) ─────────────────────
+
+enum StatutValidation {
+  DEMANDEE
+  ACCEPTEE
+  MODIFICATION_DEMANDEE
+  REJETEE
+}
+
+model Validation {
+  id          String           @id @default(uuid())
+  tacheId     String
+  tache       Tache            @relation(fields: [tacheId], references: [id])
+  validateurId String?
+  validateur  Membre?          @relation("Validateur", fields: [validateurId], references: [id])
+  statut      StatutValidation @default(DEMANDEE)
+  commentaire String?
+  version     String?
+  demandeeLe  DateTime         @default(now())
+  traiteeLe   DateTime?
+
+  @@index([tacheId])
+}
+
+// ───────────────────── RISQUES ─────────────────────
+
+enum NiveauRisque {
+  FAIBLE
+  MODERE
+  ELEVE
+  CRITIQUE
+}
+
+model Risque {
+  id           String       @id @default(uuid())
+  projetId     String
+  projet       Projet       @relation(fields: [projetId], references: [id])
+  libelle      String
+  description  String?
+  niveau       NiveauRisque @default(MODERE)
+  probabilite  Int          @default(50) // 0..100
+  mitigation   String?
+  responsableId String?
+  responsable  Membre?      @relation("RisqueResponsable", fields: [responsableId], references: [id])
+  resolu       Boolean      @default(false)
+  creeLe       DateTime     @default(now())
+
+  @@index([projetId, niveau])
+}
+
+// ───────────────────── DOCUMENTS ─────────────────────
+
+enum CategorieDocument {
+  CONTRAT
+  CAHIER_DES_CHARGES
+  TECHNIQUE
+  RAPPORT
+  PRESENTATION
+  PROCEDURE
+  AUTRE
+}
+
+model Document {
+  id         String            @id @default(uuid())
+  projetId   String?
+  projet     Projet?           @relation(fields: [projetId], references: [id])
+  titre      String
+  categorie  CategorieDocument @default(AUTRE)
+  ajouteParId String
+  ajoutePar  Membre            @relation(fields: [ajouteParId], references: [id])
+  accesRoles Role[]            // qui peut voir
+  versions   VersionDocument[]
+  creeLe     DateTime          @default(now())
+
+  @@index([categorie])
+}
+
+model VersionDocument {
+  id         String   @id @default(uuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+  numero     Int
+  url        String
+  note       String?
+  creeLe     DateTime @default(now())
+
+  @@unique([documentId, numero])
+}
+
+// ───────────────────── CALENDRIER ─────────────────────
+
+enum TypeEvenement {
+  REUNION
+  DEADLINE
+  LANCEMENT
+  RELEASE
+  AUTRE
+}
+
+model Evenement {
+  id          String        @id @default(uuid())
+  projetId    String?
+  projet      Projet?       @relation(fields: [projetId], references: [id])
+  titre       String
+  description String?
+  type        TypeEvenement @default(REUNION)
+  debut       DateTime
+  fin         DateTime?
+  rappelAvantMin Int?       // rappel X minutes avant
+  participants ParticipationEvenement[]
+  creeLe      DateTime      @default(now())
+
+  @@index([debut])
+}
+
+model ParticipationEvenement {
+  id          String    @id @default(uuid())
+  evenementId String
+  membreId    String
+  evenement   Evenement @relation(fields: [evenementId], references: [id])
+  membre      Membre    @relation(fields: [membreId], references: [id])
+
+  @@unique([evenementId, membreId])
+}
+
+// ───────────────────── NOTIFICATIONS ─────────────────────
+
+enum TypeNotification {
+  TACHE_ASSIGNEE
+  TACHE_MODIFIEE
+  ECHEANCE_PROCHE
+  VALIDATION_DEMANDEE
+  COMMENTAIRE
+  DOCUMENT_AJOUTE
+  CHANGEMENT_PROJET
+  MENTION
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  membreId  String
+  membre    Membre           @relation(fields: [membreId], references: [id])
+  type      TypeNotification
+  titre     String
+  message   String
+  lien      String?          // deep-link vers la ressource
+  lu        Boolean          @default(false)
+  creeLe    DateTime         @default(now())
+
+  @@index([membreId, lu])
+}
+
+// ───────────────────── CONTRIBUTIONS / PERFORMANCE ─────────────────────
+
+model Contribution {
+  id        String   @id @default(uuid())
+  membreId  String
+  membre    Membre   @relation(fields: [membreId], references: [id])
+  date      DateTime @default(now())
+  tachesTerminees Int @default(0)
+  tempsPasseH     Float @default(0)
+  description String?
+
+  @@index([membreId, date])
+}
+
+// ───────────────────── AUDIT ─────────────────────
+
+model JournalAction {
+  id        String   @id @default(uuid())
+  membreId  String?
+  membre    Membre?  @relation(fields: [membreId], references: [id])
+  action    String   // "CREATE_TACHE", "VALIDATE", ...
+  ressource String?  // "Tache:uuid"
+  details   String?
+  creeLe    DateTime @default(now())
+
+  @@index([creeLe])
+}
+
+// ───────────────────── ASSISTANT IA ─────────────────────
+
+enum TypeRapportIA {
+  ETAT_PROJET
+  ANALYSE_RETARDS
+  PREVISION_RISQUES
+  PERFORMANCE_EQUIPE
+  SYNTHESE
+}
+
+model RapportIA {
+  id        String        @id @default(uuid())
+  projetId  String?
+  projet    Projet?       @relation(fields: [projetId], references: [id])
+  type      TypeRapportIA
+  contenu   String        // markdown généré
+  genereeLe DateTime      @default(now())
+
+  @@index([type, genereeLe])
+}
