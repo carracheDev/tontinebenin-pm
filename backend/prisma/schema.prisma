@@ -70,6 +70,7 @@ model Membre {
   risquesResponsable Risque[]         @relation("RisqueResponsable")
   conversations    MembreConversation[]
   messagesEnvoyes  Message[]
+  historiquesTaches HistoriqueTache[]   @relation("HistoriqueTachePar")
 
   creeLe     DateTime @default(now())
   misAJourLe DateTime @updatedAt
@@ -202,11 +203,16 @@ model Jalon {
 // ───────────────────── TÂCHES (Jira-like) ─────────────────────
 
 enum StatutTache {
-  A_FAIRE
-  EN_COURS
-  EN_VALIDATION
-  TERMINE
-  BLOQUE
+  A_FAIRE         // à faire
+  EN_COURS        // en cours de développement
+  DEV_TERMINE     // développement terminé
+  ATTENTE_TEST    // en attente de test
+  EN_TEST         // en test
+  TEST_VALIDE     // test validé
+  VALIDE_MANAGER  // validé par le manager / admin
+  TERMINE         // terminé (développé + testé + validé)
+  BLOQUE          // bloqué (état parallèle)
+  EN_VALIDATION   // ancien statut — conservé pour compatibilité
 }
 
 model Tache {
@@ -271,14 +277,16 @@ model PieceJointe {
 }
 
 model HistoriqueTache {
-  id       String   @id @default(uuid())
-  tacheId  String
-  tache    Tache    @relation(fields: [tacheId], references: [id])
-  champ    String   // "statut", "assigne", ...
-  ancienne String?
-  nouvelle String?
-  parId    String?
-  creeLe   DateTime @default(now())
+  id          String   @id @default(uuid())
+  tacheId     String
+  tache       Tache    @relation(fields: [tacheId], references: [id])
+  champ       String   // "statut", "assigne", ...
+  ancienne    String?
+  nouvelle    String?
+  commentaire String?  // note de validation / justification du changement
+  parId       String?
+  par         Membre?  @relation("HistoriqueTachePar", fields: [parId], references: [id])
+  creeLe      DateTime @default(now())
 
   @@index([tacheId, creeLe])
 }

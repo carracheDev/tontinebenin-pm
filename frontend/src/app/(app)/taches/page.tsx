@@ -7,6 +7,7 @@ import { Header } from '@/components/header';
 import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
 import { PiecesJointes, type PJ } from '@/components/pieces-jointes';
+import { metaStatut } from '@/lib/statuts-taches';
 
 interface Assigne { id: string; nomComplet: string; photoUrl?: string | null }
 interface Tache {
@@ -25,7 +26,11 @@ interface Projet { id: string; nom: string }
 const COLS: { statut: string; label: string; accent: string }[] = [
   { statut: 'A_FAIRE', label: 'À faire', accent: 'var(--texte-sec)' },
   { statut: 'EN_COURS', label: 'En cours', accent: 'var(--brand)' },
-  { statut: 'EN_VALIDATION', label: 'En validation', accent: 'var(--attention)' },
+  { statut: 'DEV_TERMINE', label: 'Dév. terminé', accent: 'var(--brand)' },
+  { statut: 'ATTENTE_TEST', label: 'Attente test', accent: 'var(--attention)' },
+  { statut: 'EN_TEST', label: 'En test', accent: 'var(--attention)' },
+  { statut: 'TEST_VALIDE', label: 'Test validé', accent: 'var(--brand)' },
+  { statut: 'VALIDE_MANAGER', label: 'Validé mgr', accent: 'var(--succes)' },
   { statut: 'TERMINE', label: 'Terminé', accent: 'var(--succes)' },
   { statut: 'BLOQUE', label: 'Bloqué', accent: 'var(--annuler)' },
 ];
@@ -230,7 +235,7 @@ function DetailTache({ id, onFerme, onMaj }: { id: string; onFerme: () => void; 
               <button onClick={onFerme} className="shrink-0 text-texte-sec hover:text-texte"><X size={20} /></button>
             </div>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 font-medium text-texte-sec">{t.statut}</span>
+              <span className={`rounded-full px-2 py-0.5 font-semibold ${metaStatut(t.statut).classe}`}>{metaStatut(t.statut).label}</span>
               <span className={`rounded-full px-2 py-0.5 font-semibold ${COULEUR_PRIO[t.priorite] ?? ''}`}>{t.priorite}</span>
               {t.echeance && (
                 <span className="flex items-center gap-1 text-texte-sec">

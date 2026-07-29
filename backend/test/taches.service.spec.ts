@@ -34,13 +34,13 @@ describe('TachesService', () => {
     service = new TachesService(prisma, notifs, realtime);
   });
 
-  it('kanban renvoie les 5 colonnes', async () => {
+  it('kanban renvoie les 9 colonnes du workflow', async () => {
     prisma.tache.findMany.mockResolvedValue([
       { id: 't1', statut: 'A_FAIRE' },
       { id: 't2', statut: 'TERMINE' },
     ]);
     const r = await service.kanban('p1');
-    expect(r.donnees.colonnes).toHaveLength(5);
+    expect(r.donnees.colonnes).toHaveLength(9);
     expect(r.donnees.colonnes[0].taches).toHaveLength(1); // A_FAIRE
   });
 

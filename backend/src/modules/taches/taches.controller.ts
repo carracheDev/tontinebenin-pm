@@ -23,6 +23,7 @@ import { TachesService } from './taches.service';
 import { CreerTacheDto } from './dto/creer-tache.dto';
 import { MajTacheDto } from './dto/maj-tache.dto';
 import { DeplacerTacheDto } from './dto/deplacer-tache.dto';
+import { ChangerStatutDto } from './dto/changer-statut.dto';
 import { CommenterDto } from './dto/commenter.dto';
 import { BloquerDto } from './dto/bloquer.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.guard';
@@ -51,9 +52,40 @@ export class TachesController {
     return this.taches.creer(dto, m.id);
   }
 
+  // Suivi admin / manager — liste filtrée (déclarée avant :id)
+  @Get('taches')
+  lister(
+    @Query('projetId') projetId?: string,
+    @Query('statut') statut?: string,
+    @Query('assigneId') assigneId?: string,
+    @Query('priorite') priorite?: string,
+    @Query('echeanceAvant') echeanceAvant?: string,
+    @Query('echeanceApres') echeanceApres?: string,
+  ) {
+    return this.taches.lister({
+      projetId,
+      statut: statut as never,
+      assigneId,
+      priorite,
+      echeanceAvant,
+      echeanceApres,
+    });
+  }
+
+  @Get('taches/statistiques')
+  statistiques(@Query('projetId') projetId?: string) {
+    return this.taches.statistiques(projetId);
+  }
+
   @Get('taches/:id')
   detail(@Param('id') id: string) {
     return this.taches.detail(id);
+  }
+
+  // Workflow de validation : avancer une tâche (avec commentaire)
+  @Patch('taches/:id/statut')
+  changerStatut(@Param('id') id: string, @Body() dto: ChangerStatutDto, @MembreCourant() m: MembreAuth) {
+    return this.taches.changerStatut(id, dto.statut, dto.commentaire, { id: m.id, role: m.role });
   }
 
   @Patch('taches/:id')
