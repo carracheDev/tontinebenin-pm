@@ -18,6 +18,7 @@
   "build": {
     "appId": "bj.tontinebenin.pm",
     "productName": "TontineBenin PM",
+    "executableName": "tontinebenin-pm",
     "directories": { "output": "dist" },
     "files": ["main.js", "build/**"],
     "linux": {
