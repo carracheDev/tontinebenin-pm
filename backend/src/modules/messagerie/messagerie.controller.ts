@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
@@ -52,6 +53,11 @@ export class MessagerieController {
   @Post('conversations/:id/messages')
   envoyer(@Param('id') id: string, @Body() dto: EnvoyerMessageDto, @MembreCourant() m: MembreAuth) {
     return this.messagerie.envoyerTexte(id, m.id, dto.contenu);
+  }
+
+  @Delete('messages/:id')
+  supprimer(@Param('id') id: string, @MembreCourant() m: MembreAuth) {
+    return this.messagerie.supprimer(id, m.id, m.role === 'ADMIN');
   }
 
   @Post('conversations/:id/vocal')

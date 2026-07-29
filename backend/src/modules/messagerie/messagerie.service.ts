@@ -1,5 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { TypeMessage } from '@prisma/client';
+import { promises as fsp } from 'fs';
+import { basename, join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
 
@@ -216,5 +218,36 @@ export class MessagerieService {
       fichierTailleKo: meta.tailleKo,
     });
     return { succes: true, message: 'Fichier envoyé.', donnees: message };
+  }
+
+  /** Supprime un message (auteur ou admin). Efface le fichier associé + temps réel. */
+  async supprimer(messageId: string, membreId: string, estAdmin: boolean) {
+    const msg = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!msg) throw new NotFoundException({ message: 'Message introuvable.' });
+    if (msg.auteurId !== membreId && !estAdmin)
+      throw new ForbiddenException({ message: 'Suppression non autorisée.' });
+
+    await this.prisma.message.delete({ where: { id: messageId } });
+
+    // Efface le fichier associé (best effort)
+    const fichier = msg.audioFichier ?? msg.fichierStocke;
+    if (fichier) {
+      const dossier = msg.type === 'VOCAL' ? 'audio' : 'fichiers';
+      const chemin = join(process.cwd(), 'uploads', dossier, basename(fichier));
+      fsp.rm(chemin, { force: true }).catch(() => undefined);
+    }
+
+    // Temps réel : notifie les participants
+    const membres = await this.prisma.membreConversation.findMany({
+      where: { conversationId: msg.conversationId },
+      select: { membreId: true },
+    });
+    for (const m of membres)
+      this.realtime.emitToMembre(m.membreId, 'message:supprime', {
+        conversationId: msg.conversationId,
+        messageId,
+      });
+
+    return { succes: true, message: 'Message supprimé.' };
   }
 }

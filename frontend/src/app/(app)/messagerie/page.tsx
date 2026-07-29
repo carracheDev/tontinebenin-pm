@@ -36,6 +36,7 @@ const heure = (d: string) => new Date(d).toLocaleTimeString('fr-FR', { hour: '2-
 
 export default function MessageriePage() {
   const { membre } = useAuth();
+  const estAdmin = membre?.role === 'ADMIN';
   const [convs, setConvs] = useState<Conversation[]>([]);
   const [actifId, setActifId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -77,8 +78,16 @@ export default function MessageriePage() {
         setMessages((m) => (m.some((x) => x.id === p.message.id) ? m : [...m, p.message]));
       }
     };
+    const onSupprime = (p: { conversationId: string; messageId: string }) => {
+      chargerConvs();
+      if (p.conversationId === actifId) setMessages((m) => m.filter((x) => x.id !== p.messageId));
+    };
     s.on('message:nouveau', onNouveau);
-    return () => { s.off('message:nouveau', onNouveau); };
+    s.on('message:supprime', onSupprime);
+    return () => {
+      s.off('message:nouveau', onNouveau);
+      s.off('message:supprime', onSupprime);
+    };
   }, [actifId, chargerConvs]);
 
   // filet de sécurité : rafraîchit la liste toutes les 15 s
@@ -116,6 +125,13 @@ export default function MessageriePage() {
     fd.append('fichier', f, f.name);
     const { data } = await api.post(`/messagerie/conversations/${actifId}/fichier`, fd);
     setMessages((m) => [...m, data.donnees]);
+    chargerConvs();
+  }
+
+  async function supprimer(id: string) {
+    if (!confirm('Supprimer ce message ?')) return;
+    await api.delete(`/messagerie/messages/${id}`);
+    setMessages((m) => m.filter((x) => x.id !== id));
     chargerConvs();
   }
 
@@ -183,8 +199,9 @@ export default function MessageriePage() {
               <div className="flex-1 space-y-3 overflow-y-auto bg-fond/40 px-5 py-4">
                 {messages.map((m) => {
                   const moi = m.auteur.id === membre?.id;
+                  const peutSupprimer = moi || estAdmin;
                   return (
-                    <div key={m.id} className={`flex ${moi ? 'justify-end' : 'justify-start'}`}>
+                    <div key={m.id} className={`group flex items-end gap-1.5 ${moi ? 'flex-row-reverse' : ''}`}>
                       <div className={`max-w-[75%] ${moi ? 'items-end' : 'items-start'} flex flex-col gap-0.5`}>
                         {!moi && actif.type === 'CANAL' && <span className="px-1 text-[11px] font-medium text-texte-sec">{m.auteur.nomComplet}</span>}
                         <div className={`rounded-2xl px-3 py-2 ${moi ? 'bg-brand text-white' : 'bg-surface text-texte'}`}>
@@ -198,6 +215,15 @@ export default function MessageriePage() {
                         </div>
                         <span className={`px-1 text-[10px] text-texte-sec ${moi ? 'text-right' : ''}`}>{heure(m.creeLe)}</span>
                       </div>
+                      {peutSupprimer && (
+                        <button
+                          onClick={() => supprimer(m.id)}
+                          title="Supprimer"
+                          className="mb-4 shrink-0 text-texte-sec opacity-0 transition hover:text-annuler group-hover:opacity-100"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   );
                 })}
