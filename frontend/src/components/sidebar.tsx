@@ -16,6 +16,7 @@ import {
   PieChart,
   Users,
   Award,
+  ClipboardList,
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
@@ -31,6 +32,7 @@ export const NAV = [
   { href: '/ia', label: 'Assistant IA', icon: Sparkles },
   { href: '/analytics', label: 'Analytics', icon: PieChart },
   { href: '/equipe', label: 'Équipe', icon: Users },
+  { href: '/etat-produit', label: 'État produit', icon: ClipboardList },
   { href: '/contribution', label: 'Contribution', icon: Award, adminSeulement: true },
 ] as const;
 
