@@ -150,14 +150,14 @@ export default function MessageriePage() {
       <main className="p-3 md:p-6">
         <div className="grid h-[calc(100dvh-9rem)] grid-cols-1 overflow-hidden rounded-2xl border border-bordure bg-surface md:h-[calc(100vh-140px)] md:grid-cols-[300px_1fr]">
           {/* Colonne conversations — masquée sur mobile quand une discussion est ouverte */}
-          <div className={`${chatOuvert ? 'hidden' : 'flex'} flex-col border-r border-bordure md:flex`}>
+          <div className={`${chatOuvert ? 'hidden' : 'flex'} min-h-0 flex-col border-r border-bordure md:flex`}>
             <div className="flex items-center justify-between border-b border-bordure px-4 py-3">
               <span className="text-sm font-semibold text-texte">Conversations</span>
               <button onClick={() => setModalDM(true)} title="Nouveau message privé" className="grid h-7 w-7 place-items-center rounded-lg bg-brand text-white hover:bg-brand-fonce">
                 <Plus size={15} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {convs.map((c) => (
                 <button
                   key={c.id}
@@ -192,7 +192,7 @@ export default function MessageriePage() {
 
           {/* Fenêtre de discussion — sur mobile, visible seulement quand ouverte */}
           {actif ? (
-            <div className={`${chatOuvert ? 'flex' : 'hidden'} flex-col md:flex`}>
+            <div className={`${chatOuvert ? 'flex' : 'hidden'} min-h-0 flex-col md:flex`}>
               <div className="flex items-center gap-3 border-b border-bordure px-4 py-3 md:px-5">
                 <button
                   onClick={() => setChatOuvert(false)}
@@ -210,7 +210,7 @@ export default function MessageriePage() {
                 </div>
               </div>
 
-              <div className="flex-1 space-y-3 overflow-y-auto bg-fond/40 px-5 py-4">
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-fond/40 px-5 py-4">
                 {messages.map((m) => {
                   const moi = m.auteur.id === membre?.id;
                   const peutSupprimer = moi || estAdmin;
@@ -505,12 +505,12 @@ function ModalDM({ monId, onChoisir, onFerme }: { monId?: string; onChoisir: (id
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
-      <div className="w-full max-w-sm rounded-2xl border border-bordure bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[80vh] w-full max-w-sm flex-col rounded-2xl border border-bordure bg-surface p-5" onClick={(e) => e.stopPropagation()}>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-semibold text-texte">Message privé à…</h2>
           <button onClick={onFerme} className="text-texte-sec hover:text-texte"><X size={19} /></button>
         </div>
-        <div className="max-h-80 space-y-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
           {membres.map((m) => (
             <button key={m.id} onClick={() => onChoisir(m.id)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-surface-2">
               <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-semibold text-white">{initiales(m.nomComplet)}</div>

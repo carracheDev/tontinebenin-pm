@@ -224,7 +224,7 @@ function ModalEditerMembre({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onFerme}>
-      <div className="w-full max-w-md rounded-2xl bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-semibold text-texte">Modifier {membre.nomComplet}</h2>
           <button onClick={onFerme} className="text-texte-sec hover:text-texte"><X size={18} /></button>
