@@ -7,8 +7,8 @@ import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
-// Jitsi Meet — serveur public gratuit (aucune infrastructure à maintenir).
-const DOMAINE = 'meet.jit.si';
+// Domaine de repli (mode démo, limité à 5 min par Jitsi).
+const DOMAINE_DEMO = 'meet.jit.si';
 // Salle fixe partagée par toute l'équipe (nom volontairement peu devinable).
 const SALLE_EQUIPE = 'TontineBeninEquipe-R7x2kQ9';
 
@@ -22,13 +22,14 @@ declare global {
   }
 }
 
-function chargerJitsi(): Promise<void> {
+const scriptsCharges = new Set<string>();
+function chargerJitsi(domaine: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    if (window.JitsiMeetExternalAPI) return resolve();
+    if (scriptsCharges.has(domaine) && window.JitsiMeetExternalAPI) return resolve();
     const s = document.createElement('script');
-    s.src = `https://${DOMAINE}/external_api.js`;
+    s.src = `https://${domaine}/external_api.js`;
     s.async = true;
-    s.onload = () => resolve();
+    s.onload = () => { scriptsCharges.add(domaine); resolve(); };
     s.onerror = () => reject(new Error('Chargement Jitsi impossible.'));
     document.body.appendChild(s);
   });
@@ -40,6 +41,7 @@ export default function ReunionPage() {
   const [code, setCode] = useState('');
   const [copie, setCopie] = useState(false);
   const [invite, setInvite] = useState<'' | 'envoi' | 'ok' | 'err'>('');
+  const [modeDemo, setModeDemo] = useState(false);
   const [erreur, setErreur] = useState('');
   const conteneurRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiApi | null>(null);
@@ -64,15 +66,36 @@ export default function ReunionPage() {
     let annule = false;
     (async () => {
       try {
-        await chargerJitsi();
+        // Par défaut : mode démo (meet.jit.si). Si JaaS est configuré côté serveur,
+        // on bascule sur 8x8.vc avec un jeton signé (durée illimitée, sans modérateur).
+        let domaine = DOMAINE_DEMO;
+        let roomName = salle;
+        let jwt: string | undefined;
+        try {
+          const { data } = await api.get('/reunion/jaas');
+          const d = data.donnees as { configure: boolean; domain?: string; appId?: string; token?: string };
+          if (d?.configure && d.domain && d.appId && d.token) {
+            domaine = d.domain;
+            roomName = `${d.appId}/${salle}`;
+            jwt = d.token;
+            setModeDemo(false);
+          } else {
+            setModeDemo(true);
+          }
+        } catch {
+          setModeDemo(true);
+        }
+
+        await chargerJitsi(domaine);
         if (annule || !conteneurRef.current || !window.JitsiMeetExternalAPI) return;
-        apiRef.current = new window.JitsiMeetExternalAPI(DOMAINE, {
-          roomName: salle,
+        apiRef.current = new window.JitsiMeetExternalAPI(domaine, {
+          roomName,
+          jwt,
           parentNode: conteneurRef.current,
           width: '100%',
           height: '100%',
           userInfo: { displayName: membre?.nomComplet ?? 'Invité' },
-          configOverwrite: { startWithAudioMuted: true, prejoinPageEnabled: true },
+          configOverwrite: { startWithAudioMuted: true, prejoinPageEnabled: !jwt },
           interfaceConfigOverwrite: { MOBILE_APP_PROMO: false },
         });
         apiRef.current.addEventListener?.('readyToClose', () => quitter());
@@ -160,6 +183,11 @@ export default function ReunionPage() {
           {invite === 'err' && (
             <p className="mb-3 text-sm text-annuler">Invitation non envoyée. Utilise « Copier le lien ».</p>
           )}
+          {modeDemo && (
+            <p className="mb-3 rounded-lg bg-attention/10 px-3 py-2 text-xs text-attention">
+              ⚠️ Mode démo (meet.jit.si) : l’appel s’arrête au bout de 5 min. L’admin doit renseigner les clés 8x8 JaaS (JAAS_APP_ID, JAAS_KID, JAAS_PRIVATE_KEY) pour des réunions illimitées.
+            </p>
+          )}
           <div
             ref={conteneurRef}
             className="h-[calc(100dvh-12rem)] overflow-hidden rounded-2xl border border-bordure bg-black md:h-[calc(100vh-190px)]"
@@ -178,6 +206,17 @@ export default function ReunionPage() {
           <p className="font-medium text-texte">Comment ça marche ?</p>
           <p>👥 <b>Le plus simple :</b> tout le monde clique sur <b>« Salle d’équipe »</b> → vous êtes automatiquement dans la même réunion. Aucun lien à partager.</p>
           <p>🔗 Pour une réunion privée, crée-la puis clique sur <b>« Inviter l’équipe dans le chat »</b> : le lien part tout seul dans la messagerie, les autres n’ont qu’à cliquer dessus.</p>
+        </div>
+
+        <div className="max-w-2xl space-y-1.5 rounded-xl border border-bordure bg-surface-2 p-4 text-sm text-texte-sec">
+          <p>
+            ℹ️ Une fois les <b>clés 8x8 JaaS</b> configurées par l’admin, chacun entre <b>directement</b>
+            dans la réunion — pas d’écran « modérateur », pas de limite de durée.
+          </p>
+          <p className="text-xs">
+            Tant qu’elles ne sont pas renseignées, la visio tourne en <b>mode démo</b> (meet.jit.si) :
+            l’appel s’arrête au bout de 5 minutes et demande « Je suis l’hôte ».
+          </p>
         </div>
 
         {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}

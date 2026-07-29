@@ -16,6 +16,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { CalendrierModule } from './modules/calendrier/calendrier.module';
 import { IaModule } from './modules/ia/ia.module';
 import { MessagerieModule } from './modules/messagerie/messagerie.module';
+import { ReunionModule } from './modules/reunion/reunion.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { MessagerieModule } from './modules/messagerie/messagerie.module';
     CalendrierModule,
     IaModule,
     MessagerieModule,
+    ReunionModule,
   ],
 })
 export class AppModule {}
