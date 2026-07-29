@@ -8,6 +8,8 @@ if (process.platform === 'linux') {
   // Certains systèmes ont un /dev/shm mal configuré (crash « shared memory ») :
   // on bascule sur /tmp pour la mémoire partagée de Chromium.
   app.commandLine.appendSwitch('disable-dev-shm-usage');
+  // Écran noir fréquent sous Linux (pilotes GPU) : on désactive l'accélération.
+  app.disableHardwareAcceleration();
 }
 
 // URL de l'app déployée (backend + front sur le VPS). Modifiable via variable d'env.
