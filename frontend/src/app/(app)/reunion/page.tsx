@@ -1,0 +1,205 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import { Video, Copy, Check, LogOut, Users, Plus, LogIn } from 'lucide-react';
+import { Header } from '@/components/header';
+import { Card } from '@/components/ui';
+import { useAuth } from '@/lib/auth';
+
+// Jitsi Meet — serveur public gratuit (aucune infrastructure à maintenir).
+const DOMAINE = 'meet.jit.si';
+// Salle fixe partagée par toute l'équipe (nom volontairement peu devinable).
+const SALLE_EQUIPE = 'TontineBeninEquipe-R7x2kQ9';
+
+type JitsiApi = {
+  dispose: () => void;
+  addEventListener?: (evenement: string, cb: () => void) => void;
+};
+declare global {
+  interface Window {
+    JitsiMeetExternalAPI?: new (domaine: string, options: Record<string, unknown>) => JitsiApi;
+  }
+}
+
+function chargerJitsi(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.JitsiMeetExternalAPI) return resolve();
+    const s = document.createElement('script');
+    s.src = `https://${DOMAINE}/external_api.js`;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Chargement Jitsi impossible.'));
+    document.body.appendChild(s);
+  });
+}
+
+export default function ReunionPage() {
+  const { membre } = useAuth();
+  const [salle, setSalle] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [copie, setCopie] = useState(false);
+  const [erreur, setErreur] = useState('');
+  const conteneurRef = useRef<HTMLDivElement>(null);
+  const apiRef = useRef<JitsiApi | null>(null);
+
+  // Auto-rejoint la salle passée en lien (?salle=…)
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get('salle');
+    if (p) setSalle(p);
+  }, []);
+
+  function quitter() {
+    apiRef.current?.dispose();
+    apiRef.current = null;
+    setSalle(null);
+    // Retire le paramètre ?salle= de l'URL
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+
+  // Monte la visio quand une salle est active
+  useEffect(() => {
+    if (!salle) return;
+    let annule = false;
+    (async () => {
+      try {
+        await chargerJitsi();
+        if (annule || !conteneurRef.current || !window.JitsiMeetExternalAPI) return;
+        apiRef.current = new window.JitsiMeetExternalAPI(DOMAINE, {
+          roomName: salle,
+          parentNode: conteneurRef.current,
+          width: '100%',
+          height: '100%',
+          userInfo: { displayName: membre?.nomComplet ?? 'Invité' },
+          configOverwrite: { startWithAudioMuted: true, prejoinPageEnabled: true },
+          interfaceConfigOverwrite: { MOBILE_APP_PROMO: false },
+        });
+        apiRef.current.addEventListener?.('readyToClose', () => quitter());
+      } catch {
+        setErreur("La visio n'a pas pu démarrer. Vérifie ta connexion.");
+      }
+    })();
+    return () => {
+      annule = true;
+      apiRef.current?.dispose();
+      apiRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salle]);
+
+  function ouvrir(nom: string) {
+    setErreur('');
+    window.history.replaceState(null, '', `?salle=${encodeURIComponent(nom)}`);
+    setSalle(nom);
+  }
+
+  async function copierLien() {
+    const lien = `${window.location.origin}/reunion?salle=${encodeURIComponent(salle ?? '')}`;
+    try {
+      await navigator.clipboard.writeText(lien);
+      setCopie(true);
+      setTimeout(() => setCopie(false), 2000);
+    } catch { /* ignore */ }
+  }
+
+  // ── En réunion ──
+  if (salle) {
+    return (
+      <>
+        <Header titre="Réunion en cours" />
+        <main className="p-3 md:p-6">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-lg bg-brand-tuile px-3 py-1.5 text-sm font-medium text-brand">
+              Salle : {salle}
+            </span>
+            <button
+              onClick={copierLien}
+              className="flex items-center gap-1.5 rounded-lg border border-bordure px-3 py-1.5 text-sm font-medium text-texte transition hover:border-brand hover:text-brand"
+            >
+              {copie ? <Check size={15} /> : <Copy size={15} />}
+              {copie ? 'Lien copié !' : "Copier le lien d'invitation"}
+            </button>
+            <button
+              onClick={quitter}
+              className="ml-auto flex items-center gap-1.5 rounded-lg bg-annuler px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              <LogOut size={15} /> Quitter
+            </button>
+          </div>
+          <div
+            ref={conteneurRef}
+            className="h-[calc(100dvh-12rem)] overflow-hidden rounded-2xl border border-bordure bg-black md:h-[calc(100vh-190px)]"
+          />
+        </main>
+      </>
+    );
+  }
+
+  // ── Accueil réunions ──
+  return (
+    <>
+      <Header titre="Réunion" />
+      <main className="space-y-5 p-4 md:p-6">
+        <p className="max-w-2xl text-sm text-texte-sec">
+          Lance une visioconférence avec partage d’écran directement depuis l’app.
+          Partage le lien d’invitation dans la messagerie pour que les autres rejoignent.
+        </p>
+
+        {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Card className="flex flex-col gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-tuile text-brand">
+              <Users size={24} />
+            </div>
+            <h3 className="font-semibold text-texte">Salle d’équipe</h3>
+            <p className="text-sm text-texte-sec">La salle permanente de l’équipe. Tout le monde y rejoint la même réunion.</p>
+            <button
+              onClick={() => ouvrir(SALLE_EQUIPE)}
+              className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-fonce"
+            >
+              <Video size={17} /> Rejoindre la salle d’équipe
+            </button>
+          </Card>
+
+          <Card className="flex flex-col gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-tuile text-brand">
+              <Plus size={24} />
+            </div>
+            <h3 className="font-semibold text-texte">Nouvelle réunion</h3>
+            <p className="text-sm text-texte-sec">Crée une salle privée à usage unique, puis partage le lien.</p>
+            <button
+              onClick={() => ouvrir('TontineBenin-' + Math.random().toString(36).slice(2, 10))}
+              className="mt-auto flex items-center justify-center gap-2 rounded-lg border border-brand px-4 py-2.5 text-sm font-semibold text-brand transition hover:bg-brand-tuile"
+            >
+              <Plus size={17} /> Démarrer une réunion
+            </button>
+          </Card>
+        </div>
+
+        <Card className="flex flex-col gap-3">
+          <h3 className="font-semibold text-texte">Rejoindre avec un code</h3>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && code.trim()) ouvrir(code.trim()); }}
+              placeholder="Nom / code de la salle"
+              className="flex-1 rounded-lg border border-bordure bg-surface-2 px-3 py-2.5 text-sm text-texte outline-none focus:border-brand"
+            />
+            <button
+              onClick={() => code.trim() && ouvrir(code.trim())}
+              disabled={!code.trim()}
+              className="flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-fonce disabled:opacity-50"
+            >
+              <LogIn size={16} /> Rejoindre
+            </button>
+          </div>
+        </Card>
+
+        <p className="text-xs text-texte-sec">
+          ⚠️ La visio consomme beaucoup de données : privilégie le Wi-Fi. Coupe la caméra si la connexion est faible.
+        </p>
+      </main>
+    </>
+  );
+}
