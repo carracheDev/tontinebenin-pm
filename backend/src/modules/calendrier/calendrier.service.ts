@@ -1,6 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { TypeNotification } from '@prisma/client';
+import { promises as fsp } from 'fs';
+import { basename, join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreerEvenementDto, MajEvenementDto } from './dto/evenement.dto';
@@ -33,13 +35,32 @@ export class CalendrierService {
 
   async detail(id: string) {
     const ev = await this.prisma.evenement.findUnique({
-      where: { id }, include: { participants: PARTICIPANT },
+      where: { id },
+      include: { participants: PARTICIPANT, piecesJointes: { orderBy: { creeLe: 'desc' } } },
     });
     if (!ev) throw new NotFoundException({ message: 'Événement introuvable.' });
     return { succes: true, message: "Détail de l'événement.", donnees: ev };
   }
 
+  /** Empêche de programmer dans le passé et vérifie que la fin suit le début. */
+  private verifierDates(debut?: string, fin?: string) {
+    const marge = 60 * 1000; // tolérance 1 min (horloges décalées)
+    if (debut && new Date(debut).getTime() < Date.now() - marge) {
+      throw new BadRequestException({
+        message: 'La date de début ne peut pas être dans le passé.',
+        code: 'DATE_PASSEE',
+      });
+    }
+    if (debut && fin && new Date(fin).getTime() < new Date(debut).getTime()) {
+      throw new BadRequestException({
+        message: 'La date de fin doit être après la date de début.',
+        code: 'FIN_AVANT_DEBUT',
+      });
+    }
+  }
+
   async creer(dto: CreerEvenementDto) {
+    this.verifierDates(dto.debut, dto.fin);
     const ev = await this.prisma.evenement.create({
       data: {
         titre: dto.titre,
@@ -60,6 +81,7 @@ export class CalendrierService {
 
   async modifier(id: string, dto: MajEvenementDto) {
     await this.assurer(id);
+    this.verifierDates(dto.debut, dto.fin);
     const ev = await this.prisma.evenement.update({
       where: { id },
       data: {
@@ -97,6 +119,26 @@ export class CalendrierService {
       where: { evenementId: id, membreId },
     });
     return { succes: true, message: 'Participant retiré.' };
+  }
+
+  // ── Pièces jointes de l'événement ──
+  async ajouterPiece(
+    id: string,
+    meta: { nom: string; url: string; type: string; tailleKo: number },
+  ) {
+    await this.assurer(id);
+    const pj = await this.prisma.pieceJointeEvenement.create({
+      data: { evenementId: id, ...meta },
+    });
+    return { succes: true, message: 'Pièce jointe ajoutée.', donnees: pj };
+  }
+
+  async supprimerPiece(pjId: string, dossier: string) {
+    const pj = await this.prisma.pieceJointeEvenement.findUnique({ where: { id: pjId } });
+    if (!pj) throw new NotFoundException({ message: 'Pièce jointe introuvable.' });
+    await this.prisma.pieceJointeEvenement.delete({ where: { id: pjId } });
+    fsp.rm(join(dossier, basename(pj.url)), { force: true }).catch(() => undefined);
+    return { succes: true, message: 'Pièce jointe supprimée.' };
   }
 
   /** Rappels automatiques : toutes les 5 minutes, prévient les participants. */

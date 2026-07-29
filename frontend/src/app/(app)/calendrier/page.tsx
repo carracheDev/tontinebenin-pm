@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Plus, X, Trash2 } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Header } from '@/components/header';
 import { api } from '@/lib/api';
+import { PiecesJointes, type PJ } from '@/components/pieces-jointes';
 
 interface Evenement {
   id: string;
@@ -33,6 +34,7 @@ export default function CalendrierPage() {
   const [evenements, setEvenements] = useState<Evenement[]>([]);
   const [projets, setProjets] = useState<Projet[]>([]);
   const [modal, setModal] = useState<null | { date?: string }>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const annee = curseur.getFullYear();
   const mois = curseur.getMonth();
@@ -120,10 +122,10 @@ export default function CalendrierPage() {
               {[...evenements].sort((a, b) => +new Date(a.debut) - +new Date(b.debut)).map((e) => (
                 <div key={e.id} className="group flex items-center gap-3 rounded-lg border border-bordure px-3 py-2">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: COULEUR_TYPE[e.type] ?? 'var(--brand)' }} />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 cursor-pointer" onClick={() => setDetailId(e.id)}>
                     <p className="truncate text-sm font-medium text-texte">{e.titre}</p>
                     <p className="text-xs text-texte-sec">
-                      {new Date(e.debut).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · {e.type}
+                      {new Date(e.debut).toLocaleString('fr-FR', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })} · {e.type} · 📎
                     </p>
                   </div>
                   <button onClick={() => supprimer(e.id)} className="opacity-0 transition group-hover:opacity-100 hover:text-annuler"><Trash2 size={16} /></button>
@@ -135,6 +137,7 @@ export default function CalendrierPage() {
       </main>
 
       {modal && <ModalEvenement date={modal.date} projets={projets} onFerme={() => setModal(null)} onCree={charger} />}
+      {detailId && <DetailEvenement id={detailId} onFerme={() => setDetailId(null)} />}
     </>
   );
 }
@@ -149,8 +152,14 @@ function ModalEvenement({ date, projets, onFerme, onCree }: { date?: string; pro
   const [erreur, setErreur] = useState('');
   const [charge, setCharge] = useState(false);
 
+  // date/heure minimale = maintenant (empêche de programmer dans le passé)
+  const maintenant = new Date();
+  const minLocal = new Date(maintenant.getTime() - maintenant.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
   async function soumettre(e: React.FormEvent) {
     e.preventDefault();
+    if (debut && debut < minLocal) { setErreur('La date de début ne peut pas être dans le passé.'); return; }
+    if (fin && debut && fin < debut) { setErreur('La date de fin doit être après le début.'); return; }
     setErreur(''); setCharge(true);
     try {
       await api.post('/calendrier', {
@@ -199,11 +208,11 @@ function ModalEvenement({ date, projets, onFerme, onCree }: { date?: string; pro
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-texte">Début *</label>
-              <input type="datetime-local" required value={debut} onChange={(e) => setDebut(e.target.value)} className={champ} />
+              <input type="datetime-local" required min={minLocal} value={debut} onChange={(e) => setDebut(e.target.value)} className={champ} />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-texte">Fin</label>
-              <input type="datetime-local" value={fin} onChange={(e) => setFin(e.target.value)} className={champ} />
+              <input type="datetime-local" min={debut || minLocal} value={fin} onChange={(e) => setFin(e.target.value)} className={champ} />
             </div>
           </div>
           <div>
@@ -220,6 +229,58 @@ function ModalEvenement({ date, projets, onFerme, onCree }: { date?: string; pro
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Détail d'un événement (infos + pièces jointes) ---------- */
+interface EvenementDetail {
+  id: string;
+  titre: string;
+  description?: string | null;
+  type: string;
+  debut: string;
+  fin?: string | null;
+  piecesJointes?: PJ[];
+}
+
+function DetailEvenement({ id, onFerme }: { id: string; onFerme: () => void }) {
+  const [ev, setEv] = useState<EvenementDetail | null>(null);
+
+  const charger = useCallback(async () => {
+    const { data } = await api.get(`/calendrier/${id}`);
+    setEv(data.donnees);
+  }, [id]);
+  useEffect(() => { charger(); }, [charger]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-bordure bg-surface p-6" onClick={(e) => e.stopPropagation()}>
+        {!ev ? (
+          <p className="text-sm text-texte-sec">Chargement…</p>
+        ) : (
+          <>
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-texte">{ev.titre}</h2>
+              <button onClick={onFerme} className="shrink-0 text-texte-sec hover:text-texte"><X size={20} /></button>
+            </div>
+            <p className="mb-1 text-sm text-texte-sec">
+              {new Date(ev.debut).toLocaleString('fr-FR', { weekday: 'long', day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })} · {ev.type}
+            </p>
+            {ev.description && <p className="mb-4 mt-2 whitespace-pre-wrap text-sm text-texte-sec">{ev.description}</p>}
+
+            <div className="mt-4 border-t border-bordure pt-4">
+              <PiecesJointes
+                liste={ev.piecesJointes ?? []}
+                urlUpload={`/calendrier/${id}/pieces-jointes`}
+                baseDownload="/calendrier/pieces-jointes"
+                baseDelete="/calendrier/pieces-jointes"
+                onChange={charger}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -3,9 +3,17 @@
 import { Area, AreaChart, ResponsiveContainer } from 'recharts';
 import type { LucideIcon } from 'lucide-react';
 
-export function Card({ className = '', children }: { className?: string; children: React.ReactNode }) {
+export function Card({
+  className = '',
+  children,
+  onClick,
+}: {
+  className?: string;
+  children: React.ReactNode;
+  onClick?: () => void;
+}) {
   return (
-    <div className={`rounded-2xl border border-bordure bg-surface p-5 ${className}`}>{children}</div>
+    <div onClick={onClick} className={`rounded-2xl border border-bordure bg-surface p-5 ${className}`}>{children}</div>
   );
 }
 

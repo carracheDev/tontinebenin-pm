@@ -6,6 +6,7 @@ import { AxiosError } from 'axios';
 import { Header } from '@/components/header';
 import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
+import { PiecesJointes, type PJ } from '@/components/pieces-jointes';
 
 interface Assigne { id: string; nomComplet: string; photoUrl?: string | null }
 interface Tache {
@@ -44,6 +45,7 @@ export default function TachesPage() {
   const [charge, setCharge] = useState(true);
   const [modal, setModal] = useState(false);
   const [drag, setDrag] = useState<{ id: string; from: string } | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const chargerKanban = useCallback(async (pid: string) => {
     if (!pid) return;
@@ -143,7 +145,8 @@ export default function TachesPage() {
                         key={t.id}
                         draggable
                         onDragStart={() => setDrag({ id: t.id, from: t.statut })}
-                        className="cursor-grab rounded-xl border border-bordure bg-surface p-3 shadow-sm transition hover:border-brand active:cursor-grabbing"
+                        onClick={() => setDetailId(t.id)}
+                        className="cursor-pointer rounded-xl border border-bordure bg-surface p-3 shadow-sm transition hover:border-brand active:cursor-grabbing"
                       >
                         <div className="mb-2 flex items-start justify-between gap-2">
                           <p className="text-sm font-medium text-texte">{t.titre}</p>
@@ -186,7 +189,72 @@ export default function TachesPage() {
           onCree={() => chargerKanban(projetId)}
         />
       )}
+
+      {detailId && (
+        <DetailTache id={detailId} onFerme={() => setDetailId(null)} onMaj={() => chargerKanban(projetId)} />
+      )}
     </>
+  );
+}
+
+/* ---------- Détail d'une tâche (infos + pièces jointes) ---------- */
+interface TacheDetail {
+  id: string;
+  titre: string;
+  description?: string | null;
+  statut: string;
+  priorite: string;
+  echeance?: string | null;
+  assigne?: Assigne | null;
+  piecesJointes?: PJ[];
+}
+
+function DetailTache({ id, onFerme, onMaj }: { id: string; onFerme: () => void; onMaj: () => void }) {
+  const [t, setT] = useState<TacheDetail | null>(null);
+
+  const charger = useCallback(async () => {
+    const { data } = await api.get(`/taches/${id}`);
+    setT(data.donnees);
+  }, [id]);
+  useEffect(() => { charger(); }, [charger]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-bordure bg-surface p-6" onClick={(e) => e.stopPropagation()}>
+        {!t ? (
+          <p className="text-sm text-texte-sec">Chargement…</p>
+        ) : (
+          <>
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h2 className="text-lg font-semibold text-texte">{t.titre}</h2>
+              <button onClick={onFerme} className="shrink-0 text-texte-sec hover:text-texte"><X size={20} /></button>
+            </div>
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 font-medium text-texte-sec">{t.statut}</span>
+              <span className={`rounded-full px-2 py-0.5 font-semibold ${COULEUR_PRIO[t.priorite] ?? ''}`}>{t.priorite}</span>
+              {t.echeance && (
+                <span className="flex items-center gap-1 text-texte-sec">
+                  <CalendarClock size={13} />
+                  {new Date(t.echeance).toLocaleDateString('fr-FR')}
+                </span>
+              )}
+              {t.assigne && <span className="text-texte-sec">· {t.assigne.nomComplet}</span>}
+            </div>
+            {t.description && <p className="mb-4 whitespace-pre-wrap text-sm text-texte-sec">{t.description}</p>}
+
+            <div className="border-t border-bordure pt-4">
+              <PiecesJointes
+                liste={t.piecesJointes ?? []}
+                urlUpload={`/taches/${id}/pieces-jointes`}
+                baseDownload="/taches/pieces-jointes"
+                baseDelete="/pieces-jointes"
+                onChange={() => { charger(); onMaj(); }}
+              />
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -198,19 +266,31 @@ function ModalTache({
   const [priorite, setPriorite] = useState('MOYENNE');
   const [assigneId, setAssigneId] = useState('');
   const [echeance, setEcheance] = useState('');
+  const [fichiers, setFichiers] = useState<File[]>([]);
   const [erreur, setErreur] = useState('');
   const [charge, setCharge] = useState(false);
+  const _d = new Date();
+  const aujourdHui = new Date(_d.getTime() - _d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
   async function soumettre(e: React.FormEvent) {
     e.preventDefault();
     setErreur(''); setCharge(true);
     try {
-      await api.post('/taches', {
+      const { data } = await api.post('/taches', {
         projetId, titre, priorite,
         description: description || undefined,
         assigneId: assigneId || undefined,
         echeance: echeance ? new Date(echeance).toISOString() : undefined,
       });
+      const id = data.donnees?.id as string | undefined;
+      // Upload optionnel des pièces jointes après création de la tâche.
+      if (id && fichiers.length) {
+        for (const f of fichiers) {
+          const fd = new FormData();
+          fd.append('fichier', f, f.name);
+          await api.post(`/taches/${id}/pieces-jointes`, fd);
+        }
+      }
       onCree(); onFerme();
     } catch (err) {
       const ax = err as AxiosError<{ message?: string }>;
@@ -247,7 +327,7 @@ function ModalTache({
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-texte">Échéance</label>
-              <input type="date" value={echeance} onChange={(e) => setEcheance(e.target.value)} className={champ} />
+              <input type="date" min={aujourdHui} value={echeance} onChange={(e) => setEcheance(e.target.value)} className={champ} />
             </div>
           </div>
           <div>
@@ -256,6 +336,29 @@ function ModalTache({
               <option value="">— personne —</option>
               {membres.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}
             </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-texte">
+              Pièces jointes <span className="font-normal text-texte-sec">(optionnel — tous types)</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-bordure px-3 py-2.5 text-sm text-texte-sec transition hover:border-brand hover:text-brand">
+              <Paperclip size={15} />
+              <span>{fichiers.length ? `${fichiers.length} fichier(s) sélectionné(s)` : 'Ajouter des fichiers (images, PDF, ZIP…)'}</span>
+              <input
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => setFichiers(e.target.files ? Array.from(e.target.files) : [])}
+              />
+            </label>
+            {fichiers.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {fichiers.map((f, i) => (
+                  <li key={i} className="truncate text-xs text-texte-sec">• {f.name}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}

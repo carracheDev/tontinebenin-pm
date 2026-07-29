@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, FolderKanban, X } from 'lucide-react';
+import { Plus, FolderKanban, X, Paperclip } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Header } from '@/components/header';
 import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
+import { PiecesJointes, PJ } from '@/components/pieces-jointes';
 
 interface Projet {
   id: string;
@@ -38,6 +39,7 @@ export default function ProjetsPage() {
   const [projets, setProjets] = useState<Projet[]>([]);
   const [charge, setCharge] = useState(true);
   const [modal, setModal] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   async function recharger() {
     const { data } = await api.get('/projets');
@@ -79,7 +81,11 @@ export default function ProjetsPage() {
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {projets.map((p) => (
-              <Card key={p.id} className="flex flex-col gap-3">
+              <Card
+                key={p.id}
+                onClick={() => setDetailId(p.id)}
+                className="flex cursor-pointer flex-col gap-3 transition hover:border-brand"
+              >
                 <div className="flex items-start justify-between gap-2">
                   <h3 className="font-semibold text-texte">{p.nom}</h3>
                   <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${COULEUR_STATUT[p.statut] ?? ''}`}>
@@ -107,7 +113,43 @@ export default function ProjetsPage() {
       </main>
 
       {modal && <ModalProjet onFerme={() => setModal(false)} onCree={recharger} />}
+      {detailId && <DetailProjet id={detailId} onFerme={() => setDetailId(null)} />}
     </>
+  );
+}
+
+function DetailProjet({ id, onFerme }: { id: string; onFerme: () => void }) {
+  const [projet, setProjet] = useState<(Projet & { piecesJointes?: PJ[] }) | null>(null);
+
+  async function recharger() {
+    const { data } = await api.get(`/projets/${id}`);
+    setProjet(data.donnees);
+  }
+  useEffect(() => {
+    recharger();
+  }, [id]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
+      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-bordure bg-surface p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h2 className="text-lg font-semibold text-texte">{projet?.nom ?? 'Chargement…'}</h2>
+          <button onClick={onFerme} className="text-texte-sec hover:text-texte"><X size={20} /></button>
+        </div>
+        {projet?.description && <p className="mb-4 text-sm text-texte-sec">{projet.description}</p>}
+        {projet && (
+          <div className="border-t border-bordure pt-4">
+            <PiecesJointes
+              liste={projet.piecesJointes ?? []}
+              urlUpload={`/projets/${id}/pieces-jointes`}
+              baseDownload="/projets/pieces-jointes"
+              baseDelete="/projets/pieces-jointes"
+              onChange={recharger}
+            />
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -116,6 +158,7 @@ function ModalProjet({ onFerme, onCree }: { onFerme: () => void; onCree: () => v
   const [description, setDescription] = useState('');
   const [statut, setStatut] = useState('PLANIFIE');
   const [priorite, setPriorite] = useState('MOYENNE');
+  const [fichiers, setFichiers] = useState<File[]>([]);
   const [erreur, setErreur] = useState('');
   const [charge, setCharge] = useState(false);
 
@@ -124,7 +167,16 @@ function ModalProjet({ onFerme, onCree }: { onFerme: () => void; onCree: () => v
     setErreur('');
     setCharge(true);
     try {
-      await api.post('/projets', { nom, description: description || undefined, statut, priorite });
+      const { data } = await api.post('/projets', { nom, description: description || undefined, statut, priorite });
+      const id = data.donnees?.id as string | undefined;
+      // Upload optionnel des pièces jointes après création du projet.
+      if (id && fichiers.length) {
+        for (const f of fichiers) {
+          const fd = new FormData();
+          fd.append('fichier', f, f.name);
+          await api.post(`/projets/${id}/pieces-jointes`, fd);
+        }
+      }
       onCree();
       onFerme();
     } catch (err) {
@@ -169,6 +221,29 @@ function ModalProjet({ onFerme, onCree }: { onFerme: () => void; onCree: () => v
                 {PRIORITES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-texte">
+              Pièces jointes <span className="font-normal text-texte-sec">(optionnel — tous types)</span>
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-bordure px-3 py-2.5 text-sm text-texte-sec transition hover:border-brand hover:text-brand">
+              <Paperclip size={15} />
+              <span>{fichiers.length ? `${fichiers.length} fichier(s) sélectionné(s)` : 'Ajouter des fichiers (images, PDF, ZIP…)'}</span>
+              <input
+                type="file"
+                multiple
+                hidden
+                onChange={(e) => setFichiers(e.target.files ? Array.from(e.target.files) : [])}
+              />
+            </label>
+            {fichiers.length > 0 && (
+              <ul className="mt-2 space-y-1">
+                {fichiers.map((f, i) => (
+                  <li key={i} className="truncate text-xs text-texte-sec">• {f.name}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}

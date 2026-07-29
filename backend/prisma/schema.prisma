@@ -126,11 +126,23 @@ model Projet {
   evenements   Evenement[]
   membres      MembreProjet[]
   rapportsIA   RapportIA[]
+  piecesJointes PieceJointeProjet[]
 
   creeLe     DateTime @default(now())
   misAJourLe DateTime @updatedAt
 
   @@index([statut])
+}
+
+model PieceJointeProjet {
+  id        String   @id @default(uuid())
+  projetId  String
+  projet    Projet   @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  nom       String
+  url       String
+  type      String?
+  tailleKo  Int?
+  creeLe    DateTime @default(now())
 }
 
 model MembreProjet {
@@ -393,9 +405,21 @@ model Evenement {
   rappelAvantMin Int?       // rappel X minutes avant
   rappelEnvoye Boolean      @default(false)
   participants ParticipationEvenement[]
+  piecesJointes PieceJointeEvenement[]
   creeLe      DateTime      @default(now())
 
   @@index([debut])
+}
+
+model PieceJointeEvenement {
+  id          String    @id @default(uuid())
+  evenementId String
+  evenement   Evenement @relation(fields: [evenementId], references: [id], onDelete: Cascade)
+  nom         String
+  url         String    // nom stocké (uploads/evenements)
+  type        String?   // mime
+  tailleKo    Int?
+  creeLe      DateTime  @default(now())
 }
 
 model ParticipationEvenement {

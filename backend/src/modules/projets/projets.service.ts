@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { promises as fsp } from 'fs';
+import { basename, join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreerProjetDto } from './dto/creer-projet.dto';
 import { MajProjetDto } from './dto/maj-projet.dto';
@@ -28,6 +30,7 @@ export class ProjetsService {
         objectifs: true,
         jalons: { orderBy: { date: 'asc' } },
         risques: true,
+        piecesJointes: { orderBy: { creeLe: 'desc' } },
         _count: { select: { taches: true } },
       },
     });
@@ -68,6 +71,26 @@ export class ProjetsService {
     await this.assurerExiste(id);
     await this.prisma.projet.delete({ where: { id } });
     return { succes: true, message: 'Projet supprimé.' };
+  }
+
+  // ── Pièces jointes du projet ──
+  async ajouterPiece(
+    id: string,
+    meta: { nom: string; url: string; type: string; tailleKo: number },
+  ) {
+    await this.assurerExiste(id);
+    const pj = await this.prisma.pieceJointeProjet.create({
+      data: { projetId: id, ...meta },
+    });
+    return { succes: true, message: 'Pièce jointe ajoutée.', donnees: pj };
+  }
+
+  async supprimerPiece(pjId: string, dossier: string) {
+    const pj = await this.prisma.pieceJointeProjet.findUnique({ where: { id: pjId } });
+    if (!pj) throw new NotFoundException({ message: 'Pièce jointe introuvable.' });
+    await this.prisma.pieceJointeProjet.delete({ where: { id: pjId } });
+    fsp.rm(join(dossier, basename(pj.url)), { force: true }).catch(() => undefined);
+    return { succes: true, message: 'Pièce jointe supprimée.' };
   }
 
   private async assurerExiste(id: string) {

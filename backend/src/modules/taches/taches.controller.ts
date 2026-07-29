@@ -1,13 +1,29 @@
 import {
-  Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  StreamableFile,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { createReadStream, existsSync, mkdirSync } from 'fs';
+import { basename, extname, join } from 'path';
+import { randomUUID } from 'crypto';
 import { TachesService } from './taches.service';
 import { CreerTacheDto } from './dto/creer-tache.dto';
 import { MajTacheDto } from './dto/maj-tache.dto';
 import { DeplacerTacheDto } from './dto/deplacer-tache.dto';
 import { CommenterDto } from './dto/commenter.dto';
-import { PieceJointeDto } from './dto/piece-jointe.dto';
 import { BloquerDto } from './dto/bloquer.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -15,6 +31,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import {
   MembreCourant, MembreAuth,
 } from '../../common/decorators/membre-courant.decorator';
+
+const DOSSIER_PIECES = join(process.cwd(), 'uploads', 'pieces');
+if (!existsSync(DOSSIER_PIECES)) mkdirSync(DOSSIER_PIECES, { recursive: true });
 
 @UseGuards(JwtAuthGuard)
 @Controller()
@@ -52,9 +71,37 @@ export class TachesController {
     return this.taches.commenter(id, dto, m.id);
   }
 
+  // ── Pièces jointes (fichiers : image, PDF, ZIP… tous types) ──
   @Post('taches/:id/pieces-jointes')
-  pieceJointe(@Param('id') id: string, @Body() dto: PieceJointeDto) {
-    return this.taches.ajouterPieceJointe(id, dto);
+  @UseInterceptors(
+    FileInterceptor('fichier', {
+      storage: diskStorage({
+        destination: DOSSIER_PIECES,
+        filename: (_req, file, cb) => cb(null, randomUUID() + (extname(file.originalname) || '')),
+      }),
+      limits: { fileSize: 30 * 1024 * 1024 }, // 30 Mo max
+    }),
+  )
+  pieceJointe(@Param('id') id: string, @UploadedFile() fichier: Express.Multer.File) {
+    if (!fichier) throw new NotFoundException({ message: 'Aucun fichier reçu.' });
+    return this.taches.ajouterPieceJointe(id, {
+      nom: Buffer.from(fichier.originalname, 'latin1').toString('utf8'),
+      url: fichier.filename,
+      type: fichier.mimetype,
+      tailleKo: Math.max(1, Math.round(fichier.size / 1024)),
+    });
+  }
+
+  @Get('taches/pieces-jointes/:fichier')
+  telecharger(@Param('fichier') fichier: string): StreamableFile {
+    const chemin = join(DOSSIER_PIECES, basename(fichier));
+    if (!existsSync(chemin)) throw new NotFoundException({ message: 'Fichier introuvable.' });
+    return new StreamableFile(createReadStream(chemin));
+  }
+
+  @Delete('pieces-jointes/:pjId')
+  supprimerPiece(@Param('pjId') pjId: string) {
+    return this.taches.supprimerPieceJointe(pjId, DOSSIER_PIECES);
   }
 
   @Post('taches/:id/bloquer')

@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { StatutTache, TypeNotification } from '@prisma/client';
+import { promises as fsp } from 'fs';
+import { basename, join } from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { RealtimeGateway } from '../../realtime/realtime.gateway';
@@ -193,6 +195,15 @@ export class TachesService {
       data: { tacheId: id, nom: dto.nom, url: dto.url, type: dto.type, tailleKo: dto.tailleKo },
     });
     return { succes: true, message: 'Pièce jointe ajoutée.', donnees: pj };
+  }
+
+  async supprimerPieceJointe(pjId: string, dossier: string) {
+    const pj = await this.prisma.pieceJointe.findUnique({ where: { id: pjId } });
+    if (!pj) throw new NotFoundException({ message: 'Pièce jointe introuvable.' });
+    await this.prisma.pieceJointe.delete({ where: { id: pjId } });
+    // efface le fichier (best effort)
+    fsp.rm(join(dossier, basename(pj.url)), { force: true }).catch(() => undefined);
+    return { succes: true, message: 'Pièce jointe supprimée.' };
   }
 
   // ─── Blocage ───
