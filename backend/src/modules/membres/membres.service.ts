@@ -7,6 +7,7 @@ import * as argon2 from 'argon2';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreerMembreDto } from './dto/creer-membre.dto';
 import { MajMembreDto } from './dto/maj-membre.dto';
+import { MajProfilDto } from './dto/maj-profil.dto';
 
 const SANS_SECRET = {
   id: true,
@@ -90,6 +91,27 @@ export class MembresService {
       select: SANS_SECRET,
     });
     return { succes: true, message: 'Membre mis à jour.', donnees: membre };
+  }
+
+  /**
+   * Un membre modifie SON propre profil. Liste blanche stricte : impossible de
+   * changer son rôle, son type, son poste ou son statut par cette voie.
+   */
+  async modifierMonProfil(id: string, dto: MajProfilDto) {
+    await this.assurerExiste(id);
+    const data: Record<string, unknown> = {};
+    if (dto.nomComplet !== undefined) data.nomComplet = dto.nomComplet;
+    if (dto.telephone !== undefined) data.telephone = dto.telephone;
+    if (dto.disponibilite !== undefined) data.disponibilite = dto.disponibilite;
+    if (dto.competences !== undefined) data.competences = dto.competences;
+    if (dto.motDePasse) data.motDePasseHash = await argon2.hash(dto.motDePasse);
+
+    const membre = await this.prisma.membre.update({
+      where: { id },
+      data,
+      select: SANS_SECRET,
+    });
+    return { succes: true, message: 'Profil mis à jour.', donnees: membre };
   }
 
   /** Départ = statut PARTI (on ne supprime jamais l’historique). */

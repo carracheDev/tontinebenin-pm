@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Video, Copy, Check, LogOut, Users, Plus, LogIn } from 'lucide-react';
+import { Video, Copy, Check, LogOut, Users, Plus, LogIn, Send } from 'lucide-react';
 import { Header } from '@/components/header';
 import { Card } from '@/components/ui';
+import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 // Jitsi Meet — serveur public gratuit (aucune infrastructure à maintenir).
@@ -38,6 +39,7 @@ export default function ReunionPage() {
   const [salle, setSalle] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [copie, setCopie] = useState(false);
+  const [invite, setInvite] = useState<'' | 'envoi' | 'ok' | 'err'>('');
   const [erreur, setErreur] = useState('');
   const conteneurRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiApi | null>(null);
@@ -92,13 +94,34 @@ export default function ReunionPage() {
     setSalle(nom);
   }
 
+  function lienSalle() {
+    return `${window.location.origin}/reunion?salle=${encodeURIComponent(salle ?? '')}`;
+  }
+
   async function copierLien() {
-    const lien = `${window.location.origin}/reunion?salle=${encodeURIComponent(salle ?? '')}`;
     try {
-      await navigator.clipboard.writeText(lien);
+      await navigator.clipboard.writeText(lienSalle());
       setCopie(true);
       setTimeout(() => setCopie(false), 2000);
     } catch { /* ignore */ }
+  }
+
+  // Envoie l'invitation directement dans le canal d'équipe (plus de copier/coller).
+  async function inviterEquipe() {
+    setInvite('envoi');
+    try {
+      const { data } = await api.get('/messagerie/conversations');
+      const canal = (data.donnees as { id: string; type: string }[]).find((c) => c.type === 'CANAL');
+      if (!canal) { setInvite('err'); return; }
+      await api.post(`/messagerie/conversations/${canal.id}/messages`, {
+        contenu: `🎥 Réunion en cours — rejoignez-moi : ${lienSalle()}`,
+      });
+      setInvite('ok');
+      setTimeout(() => setInvite(''), 3000);
+    } catch {
+      setInvite('err');
+      setTimeout(() => setInvite(''), 3000);
+    }
   }
 
   // ── En réunion ──
@@ -108,15 +131,24 @@ export default function ReunionPage() {
         <Header titre="Réunion en cours" />
         <main className="p-3 md:p-6">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-lg bg-brand-tuile px-3 py-1.5 text-sm font-medium text-brand">
-              Salle : {salle}
-            </span>
+            <button
+              onClick={inviterEquipe}
+              disabled={invite === 'envoi'}
+              className="flex items-center gap-1.5 rounded-lg bg-brand px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-fonce disabled:opacity-60"
+            >
+              {invite === 'ok' ? <Check size={15} /> : <Send size={15} />}
+              {invite === 'ok'
+                ? 'Invitation envoyée !'
+                : invite === 'envoi'
+                  ? 'Envoi…'
+                  : "Inviter l'équipe dans le chat"}
+            </button>
             <button
               onClick={copierLien}
               className="flex items-center gap-1.5 rounded-lg border border-bordure px-3 py-1.5 text-sm font-medium text-texte transition hover:border-brand hover:text-brand"
             >
               {copie ? <Check size={15} /> : <Copy size={15} />}
-              {copie ? 'Lien copié !' : "Copier le lien d'invitation"}
+              {copie ? 'Copié !' : 'Copier le lien'}
             </button>
             <button
               onClick={quitter}
@@ -125,6 +157,9 @@ export default function ReunionPage() {
               <LogOut size={15} /> Quitter
             </button>
           </div>
+          {invite === 'err' && (
+            <p className="mb-3 text-sm text-annuler">Invitation non envoyée. Utilise « Copier le lien ».</p>
+          )}
           <div
             ref={conteneurRef}
             className="h-[calc(100dvh-12rem)] overflow-hidden rounded-2xl border border-bordure bg-black md:h-[calc(100vh-190px)]"
@@ -139,10 +174,11 @@ export default function ReunionPage() {
     <>
       <Header titre="Réunion" />
       <main className="space-y-5 p-4 md:p-6">
-        <p className="max-w-2xl text-sm text-texte-sec">
-          Lance une visioconférence avec partage d’écran directement depuis l’app.
-          Partage le lien d’invitation dans la messagerie pour que les autres rejoignent.
-        </p>
+        <div className="max-w-2xl space-y-2 rounded-xl border border-bordure bg-surface-2 p-4 text-sm text-texte-sec">
+          <p className="font-medium text-texte">Comment ça marche ?</p>
+          <p>👥 <b>Le plus simple :</b> tout le monde clique sur <b>« Salle d’équipe »</b> → vous êtes automatiquement dans la même réunion. Aucun lien à partager.</p>
+          <p>🔗 Pour une réunion privée, crée-la puis clique sur <b>« Inviter l’équipe dans le chat »</b> : le lien part tout seul dans la messagerie, les autres n’ont qu’à cliquer dessus.</p>
+        </div>
 
         {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}
 

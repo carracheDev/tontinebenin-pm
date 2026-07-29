@@ -100,15 +100,15 @@ export function MobileNav() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <Link href="/profil" className="flex items-center gap-3 rounded-lg p-1 transition hover:bg-surface-2">
                 <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-semibold text-white">
                   {(membre?.nomComplet ?? '?').split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase()}
                 </div>
                 <div className="leading-tight">
                   <p className="text-sm font-medium text-texte">{membre?.nomComplet ?? '—'}</p>
-                  <p className="text-xs text-texte-sec">{membre?.poste ?? membre?.role ?? ''}</p>
+                  <p className="text-xs text-brand">Voir mon profil</p>
                 </div>
-              </div>
+              </Link>
               <button onClick={() => setMenu(false)} className="text-texte-sec hover:text-texte"><X size={20} /></button>
             </div>
 

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Bell, Search } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { useAuth } from '@/lib/auth';
@@ -33,7 +34,7 @@ export function Header({ titre }: { titre: string }) {
 
         <ThemeToggle />
 
-        <div className="flex items-center gap-2 pl-1">
+        <Link href="/profil" title="Mon profil" className="flex items-center gap-2 rounded-lg pl-1 pr-1 transition hover:bg-surface-2">
           <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-semibold text-white">
             {initiales}
           </div>
@@ -41,7 +42,7 @@ export function Header({ titre }: { titre: string }) {
             <p className="text-sm font-medium text-texte">{membre?.nomComplet ?? '—'}</p>
             <p className="text-xs text-texte-sec">{membre?.poste ?? membre?.role ?? ''}</p>
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );

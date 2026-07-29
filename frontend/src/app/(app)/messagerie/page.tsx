@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Hash, Mic, Plus, Send, User, X, Play, Pause, Trash2, Paperclip, FileText, Download, ArrowLeft } from 'lucide-react';
+import { Hash, Mic, Plus, Send, User, X, Play, Pause, Trash2, Paperclip, FileText, Download, ArrowLeft, Video } from 'lucide-react';
 import { Header } from '@/components/header';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -224,7 +224,7 @@ export default function MessageriePage() {
                           ) : m.type === 'FICHIER' ? (
                             <PieceJointe m={m} moi={moi} />
                           ) : (
-                            <p className="whitespace-pre-wrap break-words text-sm">{m.contenu}</p>
+                            <TexteAvecLiens contenu={m.contenu ?? ''} moi={moi} />
                           )}
                         </div>
                         <span className={`px-1 text-[10px] text-texte-sec ${moi ? 'text-right' : ''}`}>{heure(m.creeLe)}</span>
@@ -377,6 +377,34 @@ function Composer({
         </button>
       )}
     </div>
+  );
+}
+
+/* ---------- Texte avec liens cliquables (dont « Rejoindre la réunion ») ---------- */
+function TexteAvecLiens({ contenu, moi }: { contenu: string; moi: boolean }) {
+  const parts = contenu.split(/(https?:\/\/[^\s]+)/g);
+  return (
+    <p className="whitespace-pre-wrap break-words text-sm">
+      {parts.map((p, i) => {
+        if (!/^https?:\/\//.test(p)) return <span key={i}>{p}</span>;
+        if (p.includes('/reunion')) {
+          return (
+            <a
+              key={i}
+              href={p}
+              className={`my-0.5 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold ${moi ? 'bg-white/20 text-white' : 'bg-brand text-white'}`}
+            >
+              <Video size={13} /> Rejoindre la réunion
+            </a>
+          );
+        }
+        return (
+          <a key={i} href={p} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            {p}
+          </a>
+        );
+      })}
+    </p>
   );
 }
 

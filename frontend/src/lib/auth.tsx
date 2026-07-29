@@ -19,6 +19,7 @@ interface AuthCtx {
   chargement: boolean;
   connexion: (email: string, motDePasse: string) => Promise<void>;
   inscription: (nomComplet: string, email: string, motDePasse: string, poste?: string) => Promise<void>;
+  rafraichir: () => Promise<void>;
   deconnexion: () => void;
 }
 
@@ -77,6 +78,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
+  const rafraichir = useCallback(async () => {
+    if (DEMO || !jetons.access) return;
+    const { data } = await api.get('/auth/moi');
+    setMembre(data.donnees ?? data);
+  }, []);
+
   const deconnexion = useCallback(() => {
     jetons.effacer();
     setMembre(null);
@@ -84,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <Ctx.Provider value={{ membre, chargement, connexion, inscription, deconnexion }}>
+    <Ctx.Provider value={{ membre, chargement, connexion, inscription, rafraichir, deconnexion }}>
       {children}
     </Ctx.Provider>
   );

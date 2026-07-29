@@ -15,6 +15,7 @@ interface Membre {
   role: string;
   statut: string;
   poste?: string | null;
+  telephone?: string | null;
   responsabilites?: string | null;
   photoUrl?: string | null;
 }
@@ -185,6 +186,8 @@ function ModalEditerMembre({
   onFerme: () => void;
   onEnregistre: () => void;
 }) {
+  const [nomComplet, setNomComplet] = useState(membre.nomComplet);
+  const [telephone, setTelephone] = useState(membre.telephone ?? '');
   const [poste, setPoste] = useState(membre.poste ?? '');
   const [typeMembre, setTypeMembre] = useState(
     membre.typeMembre === 'COFONDATEUR' ? 'COLLABORATEUR' : membre.typeMembre,
@@ -200,6 +203,8 @@ function ModalEditerMembre({
     setErreur('');
     try {
       await api.patch(`/membres/${membre.id}`, {
+        nomComplet: nomComplet.trim(),
+        telephone: telephone.trim() || undefined,
         poste: poste.trim() || undefined,
         typeMembre,
         role,
@@ -226,6 +231,23 @@ function ModalEditerMembre({
         </div>
 
         <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-texte-sec">Nom complet</label>
+            <input
+              value={nomComplet}
+              onChange={(e) => setNomComplet(e.target.value)}
+              className={champSelect}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-texte-sec">Téléphone</label>
+            <input
+              value={telephone}
+              onChange={(e) => setTelephone(e.target.value)}
+              placeholder="+229 …"
+              className={champSelect}
+            />
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-texte-sec">Poste / rôle affiché</label>
             <input
