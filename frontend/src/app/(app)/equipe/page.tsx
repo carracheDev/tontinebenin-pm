@@ -15,6 +15,7 @@ interface Membre {
   role: string;
   statut: string;
   poste?: string | null;
+  responsabilites?: string | null;
   photoUrl?: string | null;
 }
 interface LigneContribution {
@@ -135,6 +136,13 @@ export default function EquipePage() {
                     <Mail size={14} /> <span className="truncate">{m.email}</span>
                   </a>
 
+                  {m.responsabilites?.trim() && (
+                    <div className="rounded-lg bg-surface-2 px-3 py-2">
+                      <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-texte-sec">Responsabilités</p>
+                      <p className="whitespace-pre-line text-xs text-texte">{m.responsabilites}</p>
+                    </div>
+                  )}
+
                   <div className="border-t border-bordure pt-3">
                     <div className="mb-1 flex justify-between text-xs text-texte-sec">
                       <span>Poids de contribution</span>
@@ -183,6 +191,7 @@ function ModalEditerMembre({
   );
   const [role, setRole] = useState(membre.role);
   const [statut, setStatut] = useState(membre.statut);
+  const [responsabilites, setResponsabilites] = useState(membre.responsabilites ?? '');
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState('');
 
@@ -195,6 +204,7 @@ function ModalEditerMembre({
         typeMembre,
         role,
         statut,
+        responsabilites: responsabilites.trim() || undefined,
       });
       onEnregistre();
     } catch (e: unknown) {
@@ -244,6 +254,16 @@ function ModalEditerMembre({
             <select value={statut} onChange={(e) => setStatut(e.target.value)} className={champSelect}>
               {STATUTS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-texte-sec">Responsabilités</label>
+            <textarea
+              value={responsabilites}
+              onChange={(e) => setResponsabilites(e.target.value)}
+              rows={4}
+              placeholder="Ex : Architecture technique, revue de code, sécurité, base de données, déploiement ; planification, répartition des tâches, réunions, rapports d'avancement."
+              className={`${champSelect} resize-none`}
+            />
           </div>
 
           {erreur && <p className="text-xs text-annuler">{erreur}</p>}
