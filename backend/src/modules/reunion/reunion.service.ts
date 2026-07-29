@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { readFileSync } from 'fs';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -11,12 +12,22 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class ReunionService {
   constructor(private prisma: PrismaService) {}
 
+  /** Lit la clé privée depuis un fichier (JAAS_PRIVATE_KEY_PATH) ou la variable en ligne. */
+  private clePrivee(): string | null {
+    const chemin = process.env.JAAS_PRIVATE_KEY_PATH;
+    if (chemin) {
+      try {
+        return readFileSync(chemin, 'utf8');
+      } catch {
+        return null;
+      }
+    }
+    const inline = process.env.JAAS_PRIVATE_KEY;
+    return inline ? inline.replace(/\\n/g, '\n') : null;
+  }
+
   estConfigure(): boolean {
-    return !!(
-      process.env.JAAS_APP_ID &&
-      process.env.JAAS_KID &&
-      process.env.JAAS_PRIVATE_KEY
-    );
+    return !!(process.env.JAAS_APP_ID && process.env.JAAS_KID && this.clePrivee());
   }
 
   async jetonJaas(membreId: string) {
@@ -26,8 +37,7 @@ export class ReunionService {
 
     const appId = process.env.JAAS_APP_ID as string;
     const kid = process.env.JAAS_KID as string;
-    // La clé privée est stockée sur une ligne avec des \n échappés → on les restaure.
-    const clePrivee = (process.env.JAAS_PRIVATE_KEY as string).replace(/\\n/g, '\n');
+    const clePrivee = this.clePrivee() as string;
 
     const membre = await this.prisma.membre.findUnique({
       where: { id: membreId },
