@@ -20,7 +20,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { DEMO } from '@/lib/demo';
 
-const NAV = [
+export const NAV = [
   { href: '/dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
   { href: '/projets', label: 'Projets', icon: FolderKanban },
   { href: '/taches', label: 'Tâches', icon: ListChecks },
@@ -30,7 +30,7 @@ const NAV = [
   { href: '/analytics', label: 'Analytics', icon: PieChart },
   { href: '/equipe', label: 'Équipe', icon: Users },
   { href: '/contribution', label: 'Contribution', icon: Award, adminSeulement: true },
-];
+] as const;
 
 export function Sidebar() {
   const pathname = usePathname();

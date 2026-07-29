@@ -14,10 +14,10 @@ export function Header({ titre }: { titre: string }) {
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-bordure bg-surface/80 px-6 py-3.5 backdrop-blur">
+    <header className="sticky top-0 z-20 flex items-center gap-4 border-b border-bordure bg-surface/80 px-4 py-3.5 backdrop-blur md:px-6">
       <h1 className="text-lg font-semibold text-texte">{titre}</h1>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2 md:gap-3">
         <div className="hidden items-center gap-2 rounded-lg border border-bordure bg-surface-2 px-3 py-2 md:flex">
           <Search size={16} className="text-texte-sec" />
           <input

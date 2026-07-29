@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Hash, Mic, Plus, Send, User, X, Play, Pause, Trash2, Paperclip, FileText, Download } from 'lucide-react';
+import { Hash, Mic, Plus, Send, User, X, Play, Pause, Trash2, Paperclip, FileText, Download, ArrowLeft } from 'lucide-react';
 import { Header } from '@/components/header';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -41,6 +41,7 @@ export default function MessageriePage() {
   const [actifId, setActifId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [modalDM, setModalDM] = useState(false);
+  const [chatOuvert, setChatOuvert] = useState(false); // mobile : liste ↔ discussion
   const finRef = useRef<HTMLDivElement>(null);
 
   const chargerConvs = useCallback(async () => {
@@ -102,7 +103,13 @@ export default function MessageriePage() {
     const { data } = await api.post('/messagerie/direct', { membreId });
     await chargerConvs();
     setActifId(data.donnees.id);
+    setChatOuvert(true);
     setModalDM(false);
+  }
+
+  function ouvrirConversation(id: string) {
+    setActifId(id);
+    setChatOuvert(true);
   }
 
   async function envoyerTexte(contenu: string) {
@@ -140,10 +147,10 @@ export default function MessageriePage() {
   return (
     <>
       <Header titre="Messagerie" />
-      <main className="p-6">
-        <div className="grid h-[calc(100vh-140px)] grid-cols-1 overflow-hidden rounded-2xl border border-bordure bg-surface md:grid-cols-[300px_1fr]">
-          {/* Colonne conversations */}
-          <div className="flex flex-col border-r border-bordure">
+      <main className="p-3 md:p-6">
+        <div className="grid h-[calc(100dvh-9rem)] grid-cols-1 overflow-hidden rounded-2xl border border-bordure bg-surface md:h-[calc(100vh-140px)] md:grid-cols-[300px_1fr]">
+          {/* Colonne conversations — masquée sur mobile quand une discussion est ouverte */}
+          <div className={`${chatOuvert ? 'hidden' : 'flex'} flex-col border-r border-bordure md:flex`}>
             <div className="flex items-center justify-between border-b border-bordure px-4 py-3">
               <span className="text-sm font-semibold text-texte">Conversations</span>
               <button onClick={() => setModalDM(true)} title="Nouveau message privé" className="grid h-7 w-7 place-items-center rounded-lg bg-brand text-white hover:bg-brand-fonce">
@@ -154,7 +161,7 @@ export default function MessageriePage() {
               {convs.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setActifId(c.id)}
+                  onClick={() => ouvrirConversation(c.id)}
                   className={`flex w-full items-center gap-3 border-b border-bordure/60 px-4 py-3 text-left transition ${actifId === c.id ? 'bg-brand-tuile' : 'hover:bg-surface-2'}`}
                 >
                   <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full text-sm font-semibold ${c.type === 'CANAL' ? 'bg-brand text-white' : 'bg-surface-2 text-texte'}`}>
@@ -183,10 +190,17 @@ export default function MessageriePage() {
             </div>
           </div>
 
-          {/* Fenêtre de discussion */}
+          {/* Fenêtre de discussion — sur mobile, visible seulement quand ouverte */}
           {actif ? (
-            <div className="flex flex-col">
-              <div className="flex items-center gap-3 border-b border-bordure px-5 py-3">
+            <div className={`${chatOuvert ? 'flex' : 'hidden'} flex-col md:flex`}>
+              <div className="flex items-center gap-3 border-b border-bordure px-4 py-3 md:px-5">
+                <button
+                  onClick={() => setChatOuvert(false)}
+                  className="-ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-texte-sec hover:text-brand md:hidden"
+                  title="Retour aux conversations"
+                >
+                  <ArrowLeft size={19} />
+                </button>
                 <div className={`grid h-9 w-9 place-items-center rounded-full text-sm font-semibold ${actif.type === 'CANAL' ? 'bg-brand text-white' : 'bg-surface-2 text-texte'}`}>
                   {actif.type === 'CANAL' ? <Hash size={16} /> : initiales(actif.nom)}
                 </div>
@@ -234,7 +248,7 @@ export default function MessageriePage() {
               <Composer onTexte={envoyerTexte} onVocal={envoyerVocal} onFichier={envoyerFichier} />
             </div>
           ) : (
-            <div className="grid place-items-center text-sm text-texte-sec">Sélectionne une conversation</div>
+            <div className="hidden place-items-center text-sm text-texte-sec md:grid">Sélectionne une conversation</div>
           )}
         </div>
       </main>
