@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Video, Copy, Check, LogOut, Users, Plus, LogIn, Send } from 'lucide-react';
+import { Video, Copy, Check, LogOut, Users, Plus, LogIn, Send, UserPlus, X } from 'lucide-react';
 import { Header } from '@/components/header';
 import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -42,6 +42,7 @@ export default function ReunionPage() {
   const [copie, setCopie] = useState(false);
   const [invite, setInvite] = useState<'' | 'envoi' | 'ok' | 'err'>('');
   const [modeDemo, setModeDemo] = useState(false);
+  const [picker, setPicker] = useState<null | 'appel' | 'invite'>(null);
   const [erreur, setErreur] = useState('');
   const conteneurRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<JitsiApi | null>(null);
@@ -147,6 +148,37 @@ export default function ReunionPage() {
     }
   }
 
+  // Envoie le lien d'une salle dans la messagerie PRIVÉE d'un membre précis.
+  async function envoyerDM(membreId: string, room: string) {
+    const { data } = await api.post('/messagerie/direct', { membreId });
+    const convId = data.donnees.id;
+    const lien = `${window.location.origin}/reunion?salle=${encodeURIComponent(room)}`;
+    await api.post(`/messagerie/conversations/${convId}/messages`, {
+      contenu: `📞 ${membre?.nomComplet ?? 'Un membre'} t'invite à une réunion : ${lien}`,
+    });
+  }
+
+  async function gererChoixMembre(membreId: string) {
+    const mode = picker;
+    setPicker(null);
+    try {
+      if (mode === 'appel') {
+        // Réunion à deux : nouvelle salle privée + lien envoyé à la personne.
+        const room = 'TontineBenin-' + Math.random().toString(36).slice(2, 10);
+        await envoyerDM(membreId, room);
+        ouvrir(room);
+      } else if (mode === 'invite' && salle) {
+        // Depuis une réunion en cours : invite une personne précise.
+        await envoyerDM(membreId, salle);
+        setInvite('ok');
+        setTimeout(() => setInvite(''), 3000);
+      }
+    } catch {
+      setInvite('err');
+      setTimeout(() => setInvite(''), 3000);
+    }
+  }
+
   // ── En réunion ──
   if (salle) {
     return (
@@ -165,6 +197,12 @@ export default function ReunionPage() {
                 : invite === 'envoi'
                   ? 'Envoi…'
                   : "Inviter l'équipe dans le chat"}
+            </button>
+            <button
+              onClick={() => setPicker('invite')}
+              className="flex items-center gap-1.5 rounded-lg border border-bordure px-3 py-1.5 text-sm font-medium text-texte transition hover:border-brand hover:text-brand"
+            >
+              <UserPlus size={15} /> Inviter une personne
             </button>
             <button
               onClick={copierLien}
@@ -193,6 +231,9 @@ export default function ReunionPage() {
             className="h-[calc(100dvh-12rem)] overflow-hidden rounded-2xl border border-bordure bg-black md:h-[calc(100vh-190px)]"
           />
         </main>
+        {picker && (
+          <ChoixMembre monId={membre?.id} onChoisir={gererChoixMembre} onFerme={() => setPicker(null)} />
+        )}
       </>
     );
   }
@@ -221,7 +262,7 @@ export default function ReunionPage() {
 
         {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Card className="flex flex-col gap-3">
             <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-tuile text-brand">
               <Users size={24} />
@@ -233,6 +274,20 @@ export default function ReunionPage() {
               className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-fonce"
             >
               <Video size={17} /> Rejoindre la salle d’équipe
+            </button>
+          </Card>
+
+          <Card className="flex flex-col gap-3">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-brand-tuile text-brand">
+              <UserPlus size={24} />
+            </div>
+            <h3 className="font-semibold text-texte">Appeler une personne</h3>
+            <p className="text-sm text-texte-sec">Réunion à deux : choisis un membre, le lien arrive dans SA messagerie privée.</p>
+            <button
+              onClick={() => setPicker('appel')}
+              className="mt-auto flex items-center justify-center gap-2 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-fonce"
+            >
+              <UserPlus size={17} /> Choisir une personne
             </button>
           </Card>
 
@@ -275,6 +330,52 @@ export default function ReunionPage() {
           ⚠️ La visio consomme beaucoup de données : privilégie le Wi-Fi. Coupe la caméra si la connexion est faible.
         </p>
       </main>
+      {picker && (
+        <ChoixMembre monId={membre?.id} onChoisir={gererChoixMembre} onFerme={() => setPicker(null)} />
+      )}
     </>
+  );
+}
+
+/* ---------- Modal : choisir un membre à appeler / inviter ---------- */
+function ChoixMembre({
+  monId,
+  onChoisir,
+  onFerme,
+}: {
+  monId?: string;
+  onChoisir: (membreId: string) => void;
+  onFerme: () => void;
+}) {
+  const [membres, setMembres] = useState<{ id: string; nomComplet: string }[]>([]);
+  useEffect(() => {
+    api.get('/membres').then((r) =>
+      setMembres((r.data.donnees ?? r.data).filter((m: { id: string }) => m.id !== monId)),
+    );
+  }, [monId]);
+  const initiales = (n: string) => n.split(' ').map((x) => x[0]).slice(0, 2).join('').toUpperCase();
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
+      <div className="flex max-h-[80vh] w-full max-w-sm flex-col rounded-2xl border border-bordure bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-texte">Choisir une personne</h2>
+          <button onClick={onFerme} className="text-texte-sec hover:text-texte"><X size={19} /></button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+          {membres.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => onChoisir(m.id)}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left hover:bg-surface-2"
+            >
+              <div className="grid h-9 w-9 place-items-center rounded-full bg-brand text-sm font-semibold text-white">{initiales(m.nomComplet)}</div>
+              <span className="text-sm text-texte">{m.nomComplet}</span>
+            </button>
+          ))}
+          {membres.length === 0 && <p className="py-6 text-center text-sm text-texte-sec">Aucun autre membre.</p>}
+        </div>
+      </div>
+    </div>
   );
 }
