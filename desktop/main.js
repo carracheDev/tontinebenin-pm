@@ -5,6 +5,9 @@ const { app, BrowserWindow, shell, Menu } = require('electron');
 // ne charge qu'une URL de confiance (le VPS), le risque est minime.
 if (process.platform === 'linux') {
   app.commandLine.appendSwitch('no-sandbox');
+  // Certains systèmes ont un /dev/shm mal configuré (crash « shared memory ») :
+  // on bascule sur /tmp pour la mémoire partagée de Chromium.
+  app.commandLine.appendSwitch('disable-dev-shm-usage');
 }
 
 // URL de l'app déployée (backend + front sur le VPS). Modifiable via variable d'env.
