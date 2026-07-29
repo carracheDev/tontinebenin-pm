@@ -1,5 +1,12 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 
+// Ubuntu 24.04+ restreint le sandbox Chromium (AppArmor / user namespaces),
+// ce qui empêche l'app de démarrer. On désactive le sandbox sous Linux — l'app
+// ne charge qu'une URL de confiance (le VPS), le risque est minime.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox');
+}
+
 // URL de l'app déployée (backend + front sur le VPS). Modifiable via variable d'env.
 const APP_URL = process.env.TB_PM_URL || 'https://vps-tontinebenin.taila91a50.ts.net:10000';
 

@@ -24,7 +24,12 @@
       "target": ["AppImage", "deb"],
       "category": "Office",
       "icon": "build/icon.png",
-      "maintainer": "TontineBénin"
+      "maintainer": "TontineBénin",
+      "executableName": "tontinebenin-pm",
+      "desktop": {
+        "Name": "TontineBenin PM",
+        "StartupWMClass": "TontineBenin PM"
+      }
     },
     "win": {
       "target": ["nsis"],
