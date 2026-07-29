@@ -96,6 +96,25 @@ export class MessagerieService {
     return { succes: true, message: 'Conversations.', donnees };
   }
 
+  /** Nombre total de messages non lus (pour le badge). */
+  async nombreNonLus(membreId: string) {
+    const liens = await this.prisma.membreConversation.findMany({
+      where: { membreId },
+      select: { conversationId: true, luJusquauLe: true },
+    });
+    let total = 0;
+    for (const l of liens) {
+      total += await this.prisma.message.count({
+        where: {
+          conversationId: l.conversationId,
+          auteurId: { not: membreId },
+          ...(l.luJusquauLe ? { creeLe: { gt: l.luJusquauLe } } : {}),
+        },
+      });
+    }
+    return { succes: true, message: 'Non-lus.', donnees: { total } };
+  }
+
   /** Ouvre (ou récupère) une conversation privée entre deux membres. */
   async ouvrirDirect(membreId: string, autreId: string) {
     if (membreId === autreId)
@@ -142,7 +161,16 @@ export class MessagerieService {
   private async creer(
     conversationId: string,
     auteurId: string,
-    data: { type: TypeMessage; contenu?: string; audioFichier?: string; dureeSec?: number },
+    data: {
+      type: TypeMessage;
+      contenu?: string;
+      audioFichier?: string;
+      dureeSec?: number;
+      fichierNom?: string;
+      fichierStocke?: string;
+      fichierMime?: string;
+      fichierTailleKo?: number;
+    },
   ) {
     await this.participant(conversationId, auteurId);
     const message = await this.prisma.message.create({
@@ -173,5 +201,20 @@ export class MessagerieService {
       dureeSec,
     });
     return { succes: true, message: 'Message vocal envoyé.', donnees: message };
+  }
+
+  async envoyerFichier(
+    conversationId: string,
+    auteurId: string,
+    meta: { nom: string; stocke: string; mime: string; tailleKo: number },
+  ) {
+    const message = await this.creer(conversationId, auteurId, {
+      type: 'FICHIER',
+      fichierNom: meta.nom,
+      fichierStocke: meta.stocke,
+      fichierMime: meta.mime,
+      fichierTailleKo: meta.tailleKo,
+    });
+    return { succes: true, message: 'Fichier envoyé.', donnees: message };
   }
 }

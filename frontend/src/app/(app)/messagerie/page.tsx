@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Hash, Mic, Plus, Send, User, X, Play, Pause, Trash2 } from 'lucide-react';
+import { Hash, Mic, Plus, Send, User, X, Play, Pause, Trash2, Paperclip, FileText, Download } from 'lucide-react';
 import { Header } from '@/components/header';
 import { api } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -10,10 +10,14 @@ import { getSocket } from '@/lib/socket';
 interface Auteur { id: string; nomComplet: string; photoUrl?: string | null }
 interface Message {
   id: string;
-  type: 'TEXTE' | 'VOCAL';
+  type: 'TEXTE' | 'VOCAL' | 'FICHIER';
   contenu?: string | null;
   audioFichier?: string | null;
   dureeSec?: number | null;
+  fichierNom?: string | null;
+  fichierStocke?: string | null;
+  fichierMime?: string | null;
+  fichierTailleKo?: number | null;
   creeLe: string;
   auteur: Auteur;
 }
@@ -107,6 +111,14 @@ export default function MessageriePage() {
     chargerConvs();
   }
 
+  async function envoyerFichier(f: File) {
+    const fd = new FormData();
+    fd.append('fichier', f, f.name);
+    const { data } = await api.post(`/messagerie/conversations/${actifId}/fichier`, fd);
+    setMessages((m) => [...m, data.donnees]);
+    chargerConvs();
+  }
+
   const actif = convs.find((c) => c.id === actifId);
 
   return (
@@ -139,7 +151,13 @@ export default function MessageriePage() {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs text-texte-sec">
-                        {c.dernierMessage ? (c.dernierMessage.type === 'VOCAL' ? '🎙️ Message vocal' : c.dernierMessage.contenu) : 'Aucun message'}
+                        {c.dernierMessage
+                          ? c.dernierMessage.type === 'VOCAL'
+                            ? '🎙️ Message vocal'
+                            : c.dernierMessage.type === 'FICHIER'
+                              ? '📎 Pièce jointe'
+                              : c.dernierMessage.contenu
+                          : 'Aucun message'}
                       </span>
                       {c.nonLus > 0 && <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-full bg-brand px-1 text-[11px] font-semibold text-white">{c.nonLus}</span>}
                     </div>
@@ -172,6 +190,8 @@ export default function MessageriePage() {
                         <div className={`rounded-2xl px-3 py-2 ${moi ? 'bg-brand text-white' : 'bg-surface text-texte'}`}>
                           {m.type === 'VOCAL' ? (
                             <LecteurVocal fichier={m.audioFichier!} duree={m.dureeSec ?? 0} moi={moi} />
+                          ) : m.type === 'FICHIER' ? (
+                            <PieceJointe m={m} moi={moi} />
                           ) : (
                             <p className="whitespace-pre-wrap break-words text-sm">{m.contenu}</p>
                           )}
@@ -185,7 +205,7 @@ export default function MessageriePage() {
                 <div ref={finRef} />
               </div>
 
-              <Composer onTexte={envoyerTexte} onVocal={envoyerVocal} />
+              <Composer onTexte={envoyerTexte} onVocal={envoyerVocal} onFichier={envoyerFichier} />
             </div>
           ) : (
             <div className="grid place-items-center text-sm text-texte-sec">Sélectionne une conversation</div>
@@ -198,8 +218,16 @@ export default function MessageriePage() {
   );
 }
 
-/* ---------- Composer (texte + vocal maintenu) ---------- */
-function Composer({ onTexte, onVocal }: { onTexte: (c: string) => Promise<void>; onVocal: (b: Blob, d: number) => Promise<void> }) {
+/* ---------- Composer (texte + vocal maintenu + pièce jointe) ---------- */
+function Composer({
+  onTexte,
+  onVocal,
+  onFichier,
+}: {
+  onTexte: (c: string) => Promise<void>;
+  onVocal: (b: Blob, d: number) => Promise<void>;
+  onFichier: (f: File) => Promise<void>;
+}) {
   const [texte, setTexte] = useState('');
   const [enreg, setEnreg] = useState(false);
   const [secs, setSecs] = useState(0);
@@ -207,6 +235,7 @@ function Composer({ onTexte, onVocal }: { onTexte: (c: string) => Promise<void>;
   const chunksRef = useRef<Blob[]>([]);
   const debutRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fichierRef = useRef<HTMLInputElement>(null);
 
   async function envoyer() {
     const c = texte.trim();
@@ -251,6 +280,25 @@ function Composer({ onTexte, onVocal }: { onTexte: (c: string) => Promise<void>;
 
   return (
     <div className="flex items-center gap-2 border-t border-bordure px-4 py-3">
+      <input
+        ref={fichierRef}
+        type="file"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onFichier(f);
+          e.target.value = '';
+        }}
+      />
+      {!enreg && (
+        <button
+          onClick={() => fichierRef.current?.click()}
+          title="Joindre un fichier"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-texte-sec transition hover:text-brand"
+        >
+          <Paperclip size={19} />
+        </button>
+      )}
       {enreg ? (
         <div className="flex flex-1 items-center gap-3 rounded-lg bg-annuler/10 px-3 py-2.5">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-annuler" />
@@ -267,17 +315,23 @@ function Composer({ onTexte, onVocal }: { onTexte: (c: string) => Promise<void>;
         />
       )}
 
-      {texte.trim() && !enreg ? (
-        <button onClick={envoyer} className="grid h-10 w-10 place-items-center rounded-lg bg-brand text-white hover:bg-brand-fonce"><Send size={18} /></button>
+      {enreg ? (
+        <button
+          onClick={() => arreterEnreg(false)}
+          title="Envoyer le vocal"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand text-white transition hover:bg-brand-fonce"
+        >
+          <Send size={18} />
+        </button>
+      ) : texte.trim() ? (
+        <button onClick={envoyer} className="grid h-10 w-10 place-items-center rounded-lg bg-brand text-white hover:bg-brand-fonce">
+          <Send size={18} />
+        </button>
       ) : (
         <button
-          onMouseDown={demarrerEnreg}
-          onMouseUp={() => arreterEnreg(false)}
-          onMouseLeave={() => enreg && arreterEnreg(false)}
-          onTouchStart={(e) => { e.preventDefault(); demarrerEnreg(); }}
-          onTouchEnd={(e) => { e.preventDefault(); arreterEnreg(false); }}
-          title="Maintiens pour parler"
-          className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg transition ${enreg ? 'bg-annuler text-white' : 'bg-brand text-white hover:bg-brand-fonce'}`}
+          onClick={demarrerEnreg}
+          title="Enregistrer un vocal"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-brand text-white transition hover:bg-brand-fonce"
         >
           <Mic size={18} />
         </button>
@@ -318,6 +372,61 @@ function LecteurVocal({ fichier, duree, moi }: { fichier: string; duree: number;
       <div className={`h-1 w-24 rounded-full ${moi ? 'bg-white/30' : 'bg-bordure'}`} />
       <span className="text-xs opacity-80">{mm}:{ss}</span>
     </div>
+  );
+}
+
+/* ---------- Pièce jointe (image en aperçu / fichier téléchargeable) ---------- */
+function PieceJointe({ m, moi }: { m: Message; moi: boolean }) {
+  const estImage = !!m.fichierMime?.startsWith('image/');
+  const [imgUrl, setImgUrl] = useState('');
+
+  useEffect(() => {
+    let u = '';
+    if (estImage && m.fichierStocke) {
+      api.get(`/messagerie/fichier/${m.fichierStocke}`, { responseType: 'blob' }).then((r) => {
+        u = URL.createObjectURL(r.data as Blob);
+        setImgUrl(u);
+      });
+    }
+    return () => { if (u) URL.revokeObjectURL(u); };
+  }, [estImage, m.fichierStocke]);
+
+  async function telecharger() {
+    const { data } = await api.get(`/messagerie/fichier/${m.fichierStocke}`, { responseType: 'blob' });
+    const u = URL.createObjectURL(data as Blob);
+    const a = document.createElement('a');
+    a.href = u;
+    a.download = m.fichierNom ?? 'fichier';
+    a.click();
+    URL.revokeObjectURL(u);
+  }
+
+  if (estImage) {
+    return imgUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={imgUrl}
+        alt={m.fichierNom ?? ''}
+        onClick={() => window.open(imgUrl, '_blank')}
+        className="max-h-60 max-w-full cursor-pointer rounded-lg"
+      />
+    ) : (
+      <div className="h-40 w-40 animate-pulse rounded-lg bg-black/10" />
+    );
+  }
+
+  return (
+    <button onClick={telecharger} className="flex items-center gap-3 text-left">
+      <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${moi ? 'bg-white/20' : 'bg-brand/15 text-brand'}`}>
+        <FileText size={18} />
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">{m.fichierNom}</p>
+        <p className="flex items-center gap-1 text-xs opacity-80">
+          <Download size={11} /> {m.fichierTailleKo} Ko
+        </p>
+      </div>
+    </button>
   );
 }
 

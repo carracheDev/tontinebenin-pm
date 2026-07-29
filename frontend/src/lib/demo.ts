@@ -196,6 +196,7 @@ function resoudre(method: string, url: string): unknown {
   if (u === '/ia/synthese') return ok(rapportContenu.r2);
   if (/^\/ia\/projets\/.+\/rapport$/.test(u)) return ok(rapportContenu.r1);
 
+  if (u === '/messagerie/non-lus') return ok({ total: 2 });
   if (u === '/messagerie/conversations') {
     return ok([
       {

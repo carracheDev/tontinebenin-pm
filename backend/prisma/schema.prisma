@@ -494,6 +494,7 @@ enum TypeConversation {
 enum TypeMessage {
   TEXTE
   VOCAL
+  FICHIER
 }
 
 model Conversation {
@@ -529,6 +530,10 @@ model Message {
   contenu        String?      // texte du message
   audioFichier   String?      // nom du fichier vocal (uploads/audio)
   dureeSec       Int?         // durée du vocal en secondes
+  fichierNom     String?      // nom d'origine (ex: "rapport.pdf")
+  fichierStocke  String?      // nom stocké (uuid) dans uploads/fichiers
+  fichierMime    String?      // type MIME
+  fichierTailleKo Int?        // taille en Ko
   creeLe         DateTime     @default(now())
 
   @@index([conversationId, creeLe])

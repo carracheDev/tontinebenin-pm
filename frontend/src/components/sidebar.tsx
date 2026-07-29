@@ -1,7 +1,10 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { api } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -33,6 +36,30 @@ export function Sidebar() {
   const pathname = usePathname();
   const { membre, deconnexion } = useAuth();
   const estAdmin = membre?.role === 'ADMIN';
+  const [nonLus, setNonLus] = useState(0);
+
+  // Compteur de messages non lus (badge) : au montage, à la navigation, en temps réel, + poll
+  useEffect(() => {
+    let vivant = true;
+    const charger = async () => {
+      try {
+        const { data } = await api.get('/messagerie/non-lus');
+        if (vivant) setNonLus(data.donnees?.total ?? 0);
+      } catch {
+        /* ignore */
+      }
+    };
+    charger();
+    const t = setInterval(charger, 12000);
+    const s = getSocket();
+    const onMsg = () => charger();
+    s?.on('message:nouveau', onMsg);
+    return () => {
+      vivant = false;
+      clearInterval(t);
+      s?.off('message:nouveau', onMsg);
+    };
+  }, [pathname]);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col bg-sidebar px-4 py-6 lg:flex">
@@ -59,6 +86,11 @@ export function Sidebar() {
             >
               <Icon size={19} />
               {label}
+              {href === '/messagerie' && nonLus > 0 && (
+                <span className="ml-auto grid h-5 min-w-5 place-items-center rounded-full bg-annuler px-1 text-[11px] font-semibold text-white">
+                  {nonLus > 99 ? '99+' : nonLus}
+                </span>
+              )}
             </Link>
           );
         })}
