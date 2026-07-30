@@ -240,6 +240,13 @@ function DetailTache({ id, membres, onFerme, onMaj }: { id: string; membres: Ass
     }
   }
 
+  // Attribution rapide : choisir la personne concernée → enregistré aussitôt.
+  async function assigner(assigneId: string) {
+    await api.patch(`/taches/${id}`, { assigneId: assigneId || undefined });
+    await charger();
+    onMaj();
+  }
+
   if (edition && t) {
     return (
       <ModalTache
@@ -278,8 +285,21 @@ function DetailTache({ id, membres, onFerme, onMaj }: { id: string; membres: Ass
                   {new Date(t.echeance).toLocaleDateString('fr-FR')}
                 </span>
               )}
-              {t.assigne && <span className="text-texte-sec">· {t.assigne.nomComplet}</span>}
             </div>
+
+            {/* Attribution rapide — clique et choisis la personne concernée */}
+            <div className="mb-4 rounded-lg border border-bordure bg-surface-2 p-3">
+              <label className="mb-1.5 block text-xs font-semibold text-texte">Assigné à</label>
+              <select
+                value={t.assigne?.id ?? ''}
+                onChange={(e) => assigner(e.target.value)}
+                className="w-full rounded-lg border border-bordure bg-surface px-3 py-2 text-sm text-texte outline-none focus:border-brand"
+              >
+                <option value="">— personne —</option>
+                {membres.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}
+              </select>
+            </div>
+
             {t.description && <p className="mb-4 whitespace-pre-wrap text-sm text-texte-sec">{t.description}</p>}
 
             <div className="border-t border-bordure pt-4">
