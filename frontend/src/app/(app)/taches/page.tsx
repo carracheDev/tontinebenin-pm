@@ -1,11 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, MessageSquare, Paperclip, X, CalendarClock } from 'lucide-react';
+import { Plus, MessageSquare, Paperclip, X, CalendarClock, Pencil, Trash2 } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { Header } from '@/components/header';
 import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { PiecesJointes, type PJ } from '@/components/pieces-jointes';
 import { metaStatut } from '@/lib/statuts-taches';
 
@@ -196,7 +197,7 @@ export default function TachesPage() {
       )}
 
       {detailId && (
-        <DetailTache id={detailId} onFerme={() => setDetailId(null)} onMaj={() => chargerKanban(projetId)} />
+        <DetailTache id={detailId} membres={membres} onFerme={() => setDetailId(null)} onMaj={() => chargerKanban(projetId)} />
       )}
     </>
   );
@@ -214,14 +215,42 @@ interface TacheDetail {
   piecesJointes?: PJ[];
 }
 
-function DetailTache({ id, onFerme, onMaj }: { id: string; onFerme: () => void; onMaj: () => void }) {
+function DetailTache({ id, membres, onFerme, onMaj }: { id: string; membres: Assigne[]; onFerme: () => void; onMaj: () => void }) {
+  const { membre } = useAuth();
+  const estManager = membre?.role === 'ADMIN' || membre?.role === 'MANAGER';
   const [t, setT] = useState<TacheDetail | null>(null);
+  const [edition, setEdition] = useState(false);
+  const [suppression, setSuppression] = useState(false);
 
   const charger = useCallback(async () => {
     const { data } = await api.get(`/taches/${id}`);
     setT(data.donnees);
   }, [id]);
   useEffect(() => { charger(); }, [charger]);
+
+  async function supprimer() {
+    if (!confirm('Supprimer définitivement cette tâche ?')) return;
+    setSuppression(true);
+    try {
+      await api.delete(`/taches/${id}`);
+      onMaj();
+      onFerme();
+    } catch {
+      setSuppression(false);
+    }
+  }
+
+  if (edition && t) {
+    return (
+      <ModalTache
+        projetId=""
+        membres={membres}
+        tache={t}
+        onFerme={() => setEdition(false)}
+        onCree={() => { setEdition(false); charger(); onMaj(); }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
@@ -232,7 +261,13 @@ function DetailTache({ id, onFerme, onMaj }: { id: string; onFerme: () => void; 
           <>
             <div className="mb-3 flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-texte">{t.titre}</h2>
-              <button onClick={onFerme} className="shrink-0 text-texte-sec hover:text-texte"><X size={20} /></button>
+              <div className="flex shrink-0 items-center gap-1">
+                <button onClick={() => setEdition(true)} title="Modifier" className="grid h-8 w-8 place-items-center rounded-lg text-texte-sec transition hover:bg-surface-2 hover:text-brand"><Pencil size={16} /></button>
+                {estManager && (
+                  <button onClick={supprimer} disabled={suppression} title="Supprimer" className="grid h-8 w-8 place-items-center rounded-lg text-texte-sec transition hover:bg-annuler/10 hover:text-annuler disabled:opacity-50"><Trash2 size={16} /></button>
+                )}
+                <button onClick={onFerme} title="Fermer" className="grid h-8 w-8 place-items-center rounded-lg text-texte-sec transition hover:bg-surface-2 hover:text-texte"><X size={18} /></button>
+              </div>
             </div>
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
               <span className={`rounded-full px-2 py-0.5 font-semibold ${metaStatut(t.statut).classe}`}>{metaStatut(t.statut).label}</span>
@@ -264,13 +299,14 @@ function DetailTache({ id, onFerme, onMaj }: { id: string; onFerme: () => void; 
 }
 
 function ModalTache({
-  projetId, membres, onFerme, onCree,
-}: { projetId: string; membres: Assigne[]; onFerme: () => void; onCree: () => void }) {
-  const [titre, setTitre] = useState('');
-  const [description, setDescription] = useState('');
-  const [priorite, setPriorite] = useState('MOYENNE');
-  const [assigneId, setAssigneId] = useState('');
-  const [echeance, setEcheance] = useState('');
+  projetId, membres, tache, onFerme, onCree,
+}: { projetId: string; membres: Assigne[]; tache?: TacheDetail; onFerme: () => void; onCree: () => void }) {
+  const edition = !!tache;
+  const [titre, setTitre] = useState(tache?.titre ?? '');
+  const [description, setDescription] = useState(tache?.description ?? '');
+  const [priorite, setPriorite] = useState(tache?.priorite ?? 'MOYENNE');
+  const [assigneId, setAssigneId] = useState(tache?.assigne?.id ?? '');
+  const [echeance, setEcheance] = useState(tache?.echeance ? new Date(tache.echeance).toISOString().slice(0, 10) : '');
   const [fichiers, setFichiers] = useState<File[]>([]);
   const [erreur, setErreur] = useState('');
   const [charge, setCharge] = useState(false);
@@ -281,25 +317,30 @@ function ModalTache({
     e.preventDefault();
     setErreur(''); setCharge(true);
     try {
-      const { data } = await api.post('/taches', {
-        projetId, titre, priorite,
+      const corps = {
+        titre, priorite,
         description: description || undefined,
         assigneId: assigneId || undefined,
         echeance: echeance ? new Date(echeance).toISOString() : undefined,
-      });
-      const id = data.donnees?.id as string | undefined;
-      // Upload optionnel des pièces jointes après création de la tâche.
-      if (id && fichiers.length) {
-        for (const f of fichiers) {
-          const fd = new FormData();
-          fd.append('fichier', f, f.name);
-          await api.post(`/taches/${id}/pieces-jointes`, fd);
+      };
+      if (edition) {
+        await api.patch(`/taches/${tache!.id}`, corps);
+      } else {
+        const { data } = await api.post('/taches', { projetId, ...corps });
+        const id = data.donnees?.id as string | undefined;
+        // Upload optionnel des pièces jointes après création de la tâche.
+        if (id && fichiers.length) {
+          for (const f of fichiers) {
+            const fd = new FormData();
+            fd.append('fichier', f, f.name);
+            await api.post(`/taches/${id}/pieces-jointes`, fd);
+          }
         }
       }
       onCree(); onFerme();
     } catch (err) {
       const ax = err as AxiosError<{ message?: string }>;
-      setErreur(ax.response?.data?.message ?? 'Création impossible.');
+      setErreur(ax.response?.data?.message ?? (edition ? 'Modification impossible.' : 'Création impossible.'));
     } finally {
       setCharge(false);
     }
@@ -311,7 +352,7 @@ function ModalTache({
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4" onClick={onFerme}>
       <div className="w-full max-w-md rounded-2xl border border-bordure bg-surface p-6" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-texte">Nouvelle tâche</h2>
+          <h2 className="text-lg font-semibold text-texte">{edition ? 'Modifier la tâche' : 'Nouvelle tâche'}</h2>
           <button onClick={onFerme} className="text-texte-sec hover:text-texte"><X size={20} /></button>
         </div>
         <form onSubmit={soumettre} className="space-y-4">
@@ -343,35 +384,37 @@ function ModalTache({
             </select>
           </div>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-texte">
-              Pièces jointes <span className="font-normal text-texte-sec">(optionnel — tous types)</span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-bordure px-3 py-2.5 text-sm text-texte-sec transition hover:border-brand hover:text-brand">
-              <Paperclip size={15} />
-              <span>{fichiers.length ? `${fichiers.length} fichier(s) sélectionné(s)` : 'Ajouter des fichiers (images, PDF, ZIP…)'}</span>
-              <input
-                type="file"
-                multiple
-                hidden
-                onChange={(e) => setFichiers(e.target.files ? Array.from(e.target.files) : [])}
-              />
-            </label>
-            {fichiers.length > 0 && (
-              <ul className="mt-2 space-y-1">
-                {fichiers.map((f, i) => (
-                  <li key={i} className="truncate text-xs text-texte-sec">• {f.name}</li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {!edition && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-texte">
+                Pièces jointes <span className="font-normal text-texte-sec">(optionnel — tous types)</span>
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-bordure px-3 py-2.5 text-sm text-texte-sec transition hover:border-brand hover:text-brand">
+                <Paperclip size={15} />
+                <span>{fichiers.length ? `${fichiers.length} fichier(s) sélectionné(s)` : 'Ajouter des fichiers (images, PDF, ZIP…)'}</span>
+                <input
+                  type="file"
+                  multiple
+                  hidden
+                  onChange={(e) => setFichiers(e.target.files ? Array.from(e.target.files) : [])}
+                />
+              </label>
+              {fichiers.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {fichiers.map((f, i) => (
+                    <li key={i} className="truncate text-xs text-texte-sec">• {f.name}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           {erreur && <p className="rounded-lg bg-annuler/10 px-3 py-2 text-sm text-annuler">{erreur}</p>}
 
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onFerme} className="rounded-lg border border-bordure px-4 py-2 text-sm font-medium text-texte-sec transition hover:text-texte">Annuler</button>
             <button type="submit" disabled={charge} className="rounded-lg bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-fonce disabled:opacity-60">
-              {charge ? 'Création…' : 'Créer'}
+              {charge ? (edition ? 'Enregistrement…' : 'Création…') : (edition ? 'Enregistrer' : 'Créer')}
             </button>
           </div>
         </form>
