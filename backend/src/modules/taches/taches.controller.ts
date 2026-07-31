@@ -88,6 +88,10 @@ export class TachesController {
     return this.taches.changerStatut(id, dto.statut, dto.commentaire, { id: m.id, role: m.role });
   }
 
+  // Modifier une tâche (titre, description, priorité, ASSIGNÉ, échéance) :
+  // réservé ADMIN / MANAGER. Les devs font seulement avancer le statut (ci-dessus).
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.MANAGER)
   @Patch('taches/:id')
   modifier(@Param('id') id: string, @Body() dto: MajTacheDto, @MembreCourant() m: MembreAuth) {
     return this.taches.modifier(id, dto, m.id);

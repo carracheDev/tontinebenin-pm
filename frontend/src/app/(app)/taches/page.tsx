@@ -269,7 +269,9 @@ function DetailTache({ id, membres, onFerme, onMaj }: { id: string; membres: Ass
             <div className="mb-3 flex items-start justify-between gap-3">
               <h2 className="text-lg font-semibold text-texte">{t.titre}</h2>
               <div className="flex shrink-0 items-center gap-1">
-                <button onClick={() => setEdition(true)} title="Modifier" className="grid h-8 w-8 place-items-center rounded-lg text-texte-sec transition hover:bg-surface-2 hover:text-brand"><Pencil size={16} /></button>
+                {estManager && (
+                  <button onClick={() => setEdition(true)} title="Modifier" className="grid h-8 w-8 place-items-center rounded-lg text-texte-sec transition hover:bg-surface-2 hover:text-brand"><Pencil size={16} /></button>
+                )}
                 {estManager && (
                   <button onClick={supprimer} disabled={suppression} title="Supprimer" className="grid h-8 w-8 place-items-center rounded-lg text-texte-sec transition hover:bg-annuler/10 hover:text-annuler disabled:opacity-50"><Trash2 size={16} /></button>
                 )}
@@ -287,18 +289,24 @@ function DetailTache({ id, membres, onFerme, onMaj }: { id: string; membres: Ass
               )}
             </div>
 
-            {/* Attribution rapide — clique et choisis la personne concernée */}
-            <div className="mb-4 rounded-lg border border-bordure bg-surface-2 p-3">
-              <label className="mb-1.5 block text-xs font-semibold text-texte">Assigné à</label>
-              <select
-                value={t.assigne?.id ?? ''}
-                onChange={(e) => assigner(e.target.value)}
-                className="w-full rounded-lg border border-bordure bg-surface px-3 py-2 text-sm text-texte outline-none focus:border-brand"
-              >
-                <option value="">— personne —</option>
-                {membres.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}
-              </select>
-            </div>
+            {/* Attribution rapide — réservée à l'ADMIN et au Chef de projet (MANAGER) */}
+            {estManager ? (
+              <div className="mb-4 rounded-lg border border-bordure bg-surface-2 p-3">
+                <label className="mb-1.5 block text-xs font-semibold text-texte">Assigné à</label>
+                <select
+                  value={t.assigne?.id ?? ''}
+                  onChange={(e) => assigner(e.target.value)}
+                  className="w-full rounded-lg border border-bordure bg-surface px-3 py-2 text-sm text-texte outline-none focus:border-brand"
+                >
+                  <option value="">— personne —</option>
+                  {membres.map((m) => <option key={m.id} value={m.id}>{m.nomComplet}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div className="mb-4 text-sm text-texte-sec">
+                Assigné à : <span className="font-medium text-texte">{t.assigne?.nomComplet ?? '— personne —'}</span>
+              </div>
+            )}
 
             {t.description && <p className="mb-4 whitespace-pre-wrap text-sm text-texte-sec">{t.description}</p>}
 
